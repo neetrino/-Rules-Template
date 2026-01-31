@@ -1,0 +1,618 @@
+---
+description: Правила работы с базой данных. Применяется к схемам, миграциям и запросам.
+globs: ["**/prisma/**", "**/*.prisma", "**/db/**", "**/database/**", "**/migrations/**"]
+alwaysApply: false
+---
+
+# ПРАВИЛА РАБОТЫ С БАЗОЙ ДАННЫХ
+
+> PostgreSQL как основа. Prisma как ORM. Безопасность и производительность.
+
+---
+
+## 🎯 ГЛАВНЫЕ ПРИНЦИПЫ
+
+1. **PostgreSQL по умолчанию** — для 95% проектов
+2. **Prisma ORM** — никаких raw SQL без необходимости
+3. **Миграции обязательны** — все изменения через миграции
+4. **Индексы продуманы** — для всех частых запросов
+
+---
+
+## 🗄️ ВЫБОР БАЗЫ ДАННЫХ
+
+### Когда какую использовать
+
+| База данных | Когда использовать | Когда НЕ использовать |
+|-------------|-------------------|----------------------|
+| **PostgreSQL** | 95% проектов, ACID, сложные запросы | Очень простые проекты |
+| **MongoDB** | Документы, гибкая схема, прототипы | Транзакции, связи данных |
+| **SQLite** | Прототипы, встроенные приложения | Production web-приложения |
+| **Redis** | Кэш, сессии, очереди | Основное хранилище |
+
+### Стандартный стек
+
+```
+Production:
+├── PostgreSQL 15+ — основная БД
+├── Redis 7+ — кэш и очереди
+└── (опционально) Elasticsearch — полнотекстовый поиск
+```
+
+---
+
+## 📝 PRISMA SCHEMA
+
+### Структура schema.prisma
+
+```prisma
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==========================================
+// ПОЛЬЗОВАТЕЛИ И АВТОРИЗАЦИЯ
+// ==========================================
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String?
+  role      UserRole @default(USER)
+  isActive  Boolean  @default(true)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Связи
+  orders    Order[]
+  sessions  Session[]
+  
+  @@index([email])
+  @@index([role, isActive])
+  @@map("users")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+  MANAGER
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([token])
+  @@index([userId])
+  @@map("sessions")
+}
+
+// ==========================================
+// ПРОДУКТЫ И КАТЕГОРИИ
+// ==========================================
+
+model Category {
+  id          String  @id @default(cuid())
+  slug        String  @unique
+  name        String
+  description String?
+  parentId    String?
+  sortOrder   Int     @default(0)
+  isActive    Boolean @default(true)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Связи
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryTree")
+  products Product[]
+  
+  @@index([slug])
+  @@index([parentId])
+  @@index([isActive, sortOrder])
+  @@map("categories")
+}
+
+model Product {
+  id          String  @id @default(cuid())
+  slug        String  @unique
+  sku         String? @unique
+  name        String
+  description String?
+  price       Int     // Цена в копейках
+  comparePrice Int?   // Старая цена для скидки
+  stock       Int     @default(0)
+  categoryId  String
+  isActive    Boolean @default(true)
+  isFeatured  Boolean @default(false)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Связи
+  category   Category    @relation(fields: [categoryId], references: [id])
+  variants   Variant[]
+  images     Image[]
+  orderItems OrderItem[]
+  
+  @@index([slug])
+  @@index([sku])
+  @@index([categoryId])
+  @@index([isActive, isFeatured])
+  @@index([price])
+  @@map("products")
+}
+
+model Variant {
+  id        String @id @default(cuid())
+  productId String
+  sku       String @unique
+  name      String // "Красный, L"
+  price     Int?   // Своя цена или null = цена продукта
+  stock     Int    @default(0)
+  
+  // Атрибуты как JSON
+  attributes Json @default("{}")
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  orderItems OrderItem[]
+  
+  @@index([productId])
+  @@index([sku])
+  @@map("variants")
+}
+
+model Image {
+  id        String @id @default(cuid())
+  productId String
+  url       String
+  alt       String?
+  sortOrder Int    @default(0)
+  
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  @@index([productId])
+  @@map("images")
+}
+
+// ==========================================
+// ЗАКАЗЫ
+// ==========================================
+
+model Order {
+  id          String      @id @default(cuid())
+  number      String      @unique // ORD-2024-00001
+  userId      String?
+  status      OrderStatus @default(PENDING)
+  
+  // Суммы в копейках
+  subtotal    Int
+  discount    Int         @default(0)
+  shipping    Int         @default(0)
+  total       Int
+  
+  // Данные доставки
+  shippingAddress Json
+  billingAddress  Json?
+  
+  // Контакт
+  email       String
+  phone       String
+  
+  // Мета
+  notes       String?
+  metadata    Json        @default("{}")
+  
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  
+  // Связи
+  user        User?       @relation(fields: [userId], references: [id])
+  items       OrderItem[]
+  payments    Payment[]
+  events      OrderEvent[]
+  
+  @@index([number])
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("orders")
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+model OrderItem {
+  id        String @id @default(cuid())
+  orderId   String
+  productId String
+  variantId String?
+  
+  name      String // Сохраняем на момент заказа
+  sku       String
+  price     Int    // Цена на момент заказа
+  quantity  Int
+  total     Int    // price * quantity
+  
+  order   Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product  @relation(fields: [productId], references: [id])
+  variant Variant? @relation(fields: [variantId], references: [id])
+  
+  @@index([orderId])
+  @@map("order_items")
+}
+
+model OrderEvent {
+  id        String   @id @default(cuid())
+  orderId   String
+  type      String   // status_changed, payment_received, note_added
+  data      Json     @default("{}")
+  createdAt DateTime @default(now())
+  createdBy String?  // User ID или 'system'
+  
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  @@index([orderId])
+  @@index([type])
+  @@map("order_events")
+}
+
+model Payment {
+  id            String        @id @default(cuid())
+  orderId       String
+  provider      String        // stripe, idram, arca
+  externalId    String?       @unique
+  status        PaymentStatus @default(PENDING)
+  amount        Int
+  currency      String        @default("AMD")
+  metadata      Json          @default("{}")
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  order Order @relation(fields: [orderId], references: [id])
+  
+  @@index([orderId])
+  @@index([externalId])
+  @@index([status])
+  @@map("payments")
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+```
+
+---
+
+## 🔧 ПРАВИЛА СХЕМЫ
+
+### Именование
+
+```prisma
+// ✅ ПРАВИЛЬНО
+model User { ... }           // PascalCase для моделей
+model OrderItem { ... }      // PascalCase составные
+
+// Поля — camelCase
+firstName String
+createdAt DateTime
+isActive  Boolean
+
+// Enum — UPPER_SNAKE для значений
+enum OrderStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+}
+
+// Таблицы — snake_case через @@map
+model OrderItem {
+  ...
+  @@map("order_items")
+}
+```
+
+### ID стратегия
+
+```prisma
+// ✅ CUID — рекомендуется (короче UUID, сортируемый)
+id String @id @default(cuid())
+
+// ✅ UUID — когда нужна совместимость
+id String @id @default(uuid())
+
+// ⚠️ Auto-increment — только для внутренних таблиц
+id Int @id @default(autoincrement())
+```
+
+### Обязательные поля
+
+```prisma
+// ✅ Всегда добавляй timestamps
+model Entity {
+  id        String   @id @default(cuid())
+  // ... поля
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+```
+
+---
+
+## 📊 ИНДЕКСЫ
+
+### Когда добавлять индексы
+
+```prisma
+// ✅ Поля для поиска
+@@index([email])
+@@index([slug])
+
+// ✅ Поля для фильтрации
+@@index([status])
+@@index([isActive])
+@@index([categoryId])
+
+// ✅ Составные индексы для частых запросов
+@@index([isActive, createdAt])
+@@index([userId, status])
+
+// ✅ Уникальные индексы
+email String @unique
+slug  String @unique
+
+// ✅ Составной уникальный
+@@unique([productId, variantId])
+```
+
+### Что НЕ индексировать
+
+```prisma
+// ❌ Не индексируй:
+// - Поля с низкой кардинальностью (boolean с 50/50)
+// - Редко используемые в WHERE
+// - Большие текстовые поля (description)
+```
+
+---
+
+## 🔄 МИГРАЦИИ
+
+### Workflow миграций
+
+```bash
+# 1. Изменить schema.prisma
+
+# 2. Создать миграцию (development)
+npx prisma migrate dev --name add_user_role
+
+# 3. Применить миграцию (production)
+npx prisma migrate deploy
+
+# 4. Сгенерировать клиент
+npx prisma generate
+```
+
+### Именование миграций
+
+```bash
+# ✅ ПРАВИЛЬНО — описательные имена
+add_users_table
+add_user_email_index
+add_order_status_column
+rename_price_to_amount
+remove_deprecated_field
+
+# ❌ ПЛОХО
+update
+fix
+changes
+migration1
+```
+
+### Опасные миграции
+
+```prisma
+// ⚠️ ОСТОРОЖНО — потеря данных
+
+// Удаление колонки
+// СНАЧАЛА: убедись что данные не нужны или мигрированы
+
+// Переименование колонки  
+// ИСПОЛЬЗУЙ: @map для обратной совместимости
+model User {
+  firstName String @map("first_name") // Было first_name в БД
+}
+
+// Изменение типа
+// СОЗДАЙ: новую колонку, мигрируй данные, удали старую
+```
+
+---
+
+## 📝 ЗАПРОСЫ PRISMA
+
+### Правильные паттерны
+
+```typescript
+// ✅ Select только нужные поля
+const users = await prisma.user.findMany({
+  select: {
+    id: true,
+    name: true,
+    email: true,
+  },
+});
+
+// ✅ Include для связей
+const order = await prisma.order.findUnique({
+  where: { id: orderId },
+  include: {
+    items: true,
+    user: {
+      select: { id: true, name: true, email: true },
+    },
+  },
+});
+
+// ✅ Пагинация
+const products = await prisma.product.findMany({
+  skip: (page - 1) * limit,
+  take: limit,
+  orderBy: { createdAt: 'desc' },
+});
+
+// ✅ Транзакции
+const [order, payment] = await prisma.$transaction([
+  prisma.order.create({ data: orderData }),
+  prisma.payment.create({ data: paymentData }),
+]);
+
+// ✅ Интерактивные транзакции
+const result = await prisma.$transaction(async (tx) => {
+  const product = await tx.product.findUnique({ where: { id } });
+  
+  if (product.stock < quantity) {
+    throw new Error('Insufficient stock');
+  }
+  
+  await tx.product.update({
+    where: { id },
+    data: { stock: { decrement: quantity } },
+  });
+  
+  return tx.orderItem.create({ data: itemData });
+});
+```
+
+### Антипаттерны
+
+```typescript
+// ❌ N+1 проблема
+const orders = await prisma.order.findMany();
+for (const order of orders) {
+  const items = await prisma.orderItem.findMany({
+    where: { orderId: order.id },
+  }); // N дополнительных запросов!
+}
+
+// ✅ Используй include
+const orders = await prisma.order.findMany({
+  include: { items: true },
+});
+
+// ❌ Загрузка всех данных
+const allProducts = await prisma.product.findMany(); // Миллионы записей!
+
+// ✅ Используй пагинацию
+const products = await prisma.product.findMany({
+  take: 100,
+  skip: offset,
+});
+
+// ❌ Raw SQL без необходимости
+const users = await prisma.$queryRaw`SELECT * FROM users WHERE ...`;
+
+// ✅ Используй Prisma Query API
+const users = await prisma.user.findMany({
+  where: { ... },
+});
+```
+
+---
+
+## 🔒 БЕЗОПАСНОСТЬ
+
+### Защита от SQL Injection
+
+```typescript
+// ✅ Prisma автоматически экранирует параметры
+const user = await prisma.user.findFirst({
+  where: { email: userInput }, // Безопасно
+});
+
+// ⚠️ Raw SQL — используй параметры
+const result = await prisma.$queryRaw`
+  SELECT * FROM users WHERE email = ${userInput}
+`; // Prisma экранирует
+
+// ❌ НИКОГДА не конкатенируй строки
+const result = await prisma.$queryRawUnsafe(
+  `SELECT * FROM users WHERE email = '${userInput}'` // SQL INJECTION!
+);
+```
+
+### Мягкое удаление
+
+```prisma
+model Product {
+  id        String    @id @default(cuid())
+  // ...
+  deletedAt DateTime? // null = активен, дата = удалён
+  
+  @@index([deletedAt])
+}
+```
+
+```typescript
+// Middleware для автоматической фильтрации
+prisma.$use(async (params, next) => {
+  if (params.model === 'Product') {
+    if (params.action === 'findMany' || params.action === 'findFirst') {
+      params.args.where = {
+        ...params.args.where,
+        deletedAt: null,
+      };
+    }
+  }
+  return next(params);
+});
+```
+
+---
+
+## 📋 CHECKLIST
+
+### Перед production
+
+- [ ] Все индексы созданы для частых запросов
+- [ ] Миграции протестированы на копии данных
+- [ ] Нет N+1 проблем
+- [ ] Транзакции для связанных операций
+- [ ] Мягкое удаление для важных данных
+- [ ] Backup настроен
+
+---
+
+**Версия:** 1.0
+**Дата:** 2025-01-31

@@ -1,0 +1,491 @@
+---
+description: Правила тестирования. Применяется к тестовым файлам и стратегии тестирования.
+globs: ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts", "**/tests/**", "**/__tests__/**"]
+alwaysApply: false
+---
+
+# ПРАВИЛА ТЕСТИРОВАНИЯ
+
+> Тесты — это документация и защита от регрессий. Пиши тесты для важного.
+
+---
+
+## 🎯 СТРАТЕГИЯ ТЕСТИРОВАНИЯ
+
+### Пирамида тестов
+
+```
+        /\
+       /  \      E2E (5-10%)
+      /----\     Критичные user flows
+     /      \
+    /--------\   Integration (20-30%)
+   /          \  API, сервисы, хуки
+  /------------\ 
+ /              \ Unit (60-70%)
+/________________\ Бизнес-логика, утилиты
+```
+
+### Что тестировать обязательно
+
+| Тип | Покрытие | Приоритет |
+|-----|----------|-----------|
+| Бизнес-логика (domain) | ≥ 80% | 🔴 Критично |
+| API endpoints | 100% happy path | 🔴 Критично |
+| Утилиты | ≥ 70% | 🟡 Важно |
+| React хуки (кастомные) | ≥ 70% | 🟡 Важно |
+| UI компоненты | По необходимости | 🟢 Опционально |
+
+### Что можно НЕ тестировать
+
+- Простые UI компоненты (только рендерят данные)
+- Типы TypeScript
+- Конфигурационные файлы
+- Сторонние библиотеки
+
+---
+
+## 🧪 UNIT ТЕСТЫ
+
+### Структура теста (AAA)
+
+```typescript
+// Arrange-Act-Assert
+
+describe('calculateOrderTotal', () => {
+  it('should calculate total with discount', () => {
+    // Arrange (Подготовка)
+    const items = [
+      { price: 1000, quantity: 2 },
+      { price: 500, quantity: 1 },
+    ];
+    const discount = 10; // 10%
+    
+    // Act (Действие)
+    const total = calculateOrderTotal(items, discount);
+    
+    // Assert (Проверка)
+    expect(total).toBe(2250); // (2000 + 500) * 0.9
+  });
+  
+  it('should return 0 for empty items', () => {
+    expect(calculateOrderTotal([], 0)).toBe(0);
+  });
+  
+  it('should throw for negative discount', () => {
+    expect(() => calculateOrderTotal([], -10)).toThrow('Invalid discount');
+  });
+});
+```
+
+### Именование тестов
+
+```typescript
+// ✅ ХОРОШО — описывает поведение
+it('should return user by id when user exists')
+it('should throw NotFoundError when user does not exist')
+it('should hash password with argon2')
+it('should send confirmation email after order creation')
+
+// ❌ ПЛОХО — не описывает результат
+it('test getUser')
+it('getUser works')
+it('test 1')
+```
+
+### Группировка тестов
+
+```typescript
+describe('OrderService', () => {
+  describe('create', () => {
+    it('should create order with valid data', () => { ... });
+    it('should reserve stock for each item', () => { ... });
+    it('should throw if insufficient stock', () => { ... });
+  });
+  
+  describe('cancel', () => {
+    it('should cancel pending order', () => { ... });
+    it('should throw if order already shipped', () => { ... });
+    it('should restore stock after cancellation', () => { ... });
+  });
+  
+  describe('calculateTotal', () => {
+    it('should sum all items', () => { ... });
+    it('should apply discount', () => { ... });
+    it('should add shipping cost', () => { ... });
+  });
+});
+```
+
+---
+
+## 🔗 INTEGRATION ТЕСТЫ
+
+### API тесты (NestJS)
+
+```typescript
+import { Test } from '@nestjs/testing';
+import { INestApplication } from '@nestjs/common';
+import * as request from 'supertest';
+import { AppModule } from '../src/app.module';
+import { PrismaService } from '../src/prisma/prisma.service';
+
+describe('ProductsController (e2e)', () => {
+  let app: INestApplication;
+  let prisma: PrismaService;
+  
+  beforeAll(async () => {
+    const moduleRef = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
+    
+    app = moduleRef.createNestApplication();
+    prisma = moduleRef.get(PrismaService);
+    await app.init();
+  });
+  
+  afterAll(async () => {
+    await app.close();
+  });
+  
+  beforeEach(async () => {
+    // Очистка тестовых данных
+    await prisma.product.deleteMany();
+  });
+  
+  describe('GET /products', () => {
+    it('should return empty list', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/api/v1/products')
+        .expect(200);
+      
+      expect(response.body.data).toEqual([]);
+      expect(response.body.meta.total).toBe(0);
+    });
+    
+    it('should return products with pagination', async () => {
+      // Arrange
+      await prisma.product.createMany({
+        data: [
+          { name: 'Product 1', price: 1000 },
+          { name: 'Product 2', price: 2000 },
+        ],
+      });
+      
+      // Act
+      const response = await request(app.getHttpServer())
+        .get('/api/v1/products?page=1&limit=1')
+        .expect(200);
+      
+      // Assert
+      expect(response.body.data).toHaveLength(1);
+      expect(response.body.meta.total).toBe(2);
+      expect(response.body.meta.totalPages).toBe(2);
+    });
+  });
+  
+  describe('POST /products', () => {
+    it('should create product', async () => {
+      const dto = {
+        name: 'New Product',
+        price: 5000,
+        categoryId: 'cat-123',
+      };
+      
+      const response = await request(app.getHttpServer())
+        .post('/api/v1/products')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(dto)
+        .expect(201);
+      
+      expect(response.body.data.name).toBe('New Product');
+      expect(response.body.data.id).toBeDefined();
+    });
+    
+    it('should return 400 for invalid data', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/api/v1/products')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ name: '' }) // Invalid
+        .expect(400);
+      
+      expect(response.body.errors).toBeDefined();
+    });
+    
+    it('should return 401 without auth', async () => {
+      await request(app.getHttpServer())
+        .post('/api/v1/products')
+        .send({ name: 'Test' })
+        .expect(401);
+    });
+  });
+});
+```
+
+### Тестирование хуков React
+
+```typescript
+import { renderHook, act, waitFor } from '@testing-library/react';
+import { useProducts } from './useProducts';
+
+// Mock API
+jest.mock('@/lib/api', () => ({
+  fetchProducts: jest.fn(),
+}));
+
+describe('useProducts', () => {
+  it('should fetch products on mount', async () => {
+    const mockProducts = [{ id: '1', name: 'Product 1' }];
+    (fetchProducts as jest.Mock).mockResolvedValue(mockProducts);
+    
+    const { result } = renderHook(() => useProducts());
+    
+    // Начальное состояние
+    expect(result.current.isLoading).toBe(true);
+    expect(result.current.data).toBeUndefined();
+    
+    // После загрузки
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+    
+    expect(result.current.data).toEqual(mockProducts);
+  });
+  
+  it('should handle error', async () => {
+    const error = new Error('Failed to fetch');
+    (fetchProducts as jest.Mock).mockRejectedValue(error);
+    
+    const { result } = renderHook(() => useProducts());
+    
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+    
+    expect(result.current.error).toBe(error);
+  });
+  
+  it('should refetch when filters change', async () => {
+    const { result, rerender } = renderHook(
+      ({ filters }) => useProducts(filters),
+      { initialProps: { filters: { category: 'a' } } }
+    );
+    
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+    
+    // Изменяем фильтры
+    rerender({ filters: { category: 'b' } });
+    
+    expect(fetchProducts).toHaveBeenCalledWith({ category: 'b' });
+  });
+});
+```
+
+---
+
+## 🌐 E2E ТЕСТЫ
+
+### Playwright
+
+```typescript
+// tests/e2e/checkout.spec.ts
+import { test, expect } from '@playwright/test';
+
+test.describe('Checkout Flow', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+  });
+  
+  test('should complete checkout as guest', async ({ page }) => {
+    // Добавить товар в корзину
+    await page.goto('/products/iphone-15');
+    await page.click('button:has-text("В корзину")');
+    
+    // Перейти в корзину
+    await page.click('[data-testid="cart-icon"]');
+    await expect(page.locator('.cart-item')).toHaveCount(1);
+    
+    // Перейти к оформлению
+    await page.click('button:has-text("Оформить заказ")');
+    
+    // Заполнить форму
+    await page.fill('[name="email"]', 'test@example.com');
+    await page.fill('[name="phone"]', '+37498123456');
+    await page.fill('[name="address"]', 'Test Address 123');
+    
+    // Выбрать способ оплаты
+    await page.click('[data-testid="payment-card"]');
+    
+    // Подтвердить заказ
+    await page.click('button:has-text("Оплатить")');
+    
+    // Проверить успех
+    await expect(page).toHaveURL(/\/orders\/ORD-/);
+    await expect(page.locator('h1')).toContainText('Заказ оформлен');
+  });
+  
+  test('should show error for invalid email', async ({ page }) => {
+    await page.goto('/checkout');
+    await page.fill('[name="email"]', 'invalid-email');
+    await page.click('button:has-text("Продолжить")');
+    
+    await expect(page.locator('.error-message')).toContainText('Invalid email');
+  });
+});
+```
+
+---
+
+## 🎭 МОКИ И СТАБЫ
+
+### Mock функций
+
+```typescript
+// ✅ Jest mock
+const mockFn = jest.fn();
+mockFn.mockReturnValue(42);
+mockFn.mockResolvedValue({ data: [] });
+mockFn.mockRejectedValue(new Error('Failed'));
+
+// Проверки
+expect(mockFn).toHaveBeenCalled();
+expect(mockFn).toHaveBeenCalledWith('arg1', 'arg2');
+expect(mockFn).toHaveBeenCalledTimes(3);
+```
+
+### Mock модулей
+
+```typescript
+// __mocks__/prisma.ts
+export const prisma = {
+  user: {
+    findUnique: jest.fn(),
+    findMany: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+  },
+  $transaction: jest.fn((fn) => fn(prisma)),
+};
+
+// В тесте
+jest.mock('@/lib/prisma', () => require('./__mocks__/prisma'));
+
+it('should find user by id', async () => {
+  const mockUser = { id: '1', name: 'John' };
+  (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
+  
+  const result = await userService.findById('1');
+  
+  expect(result).toEqual(mockUser);
+  expect(prisma.user.findUnique).toHaveBeenCalledWith({
+    where: { id: '1' },
+  });
+});
+```
+
+### Фабрики тестовых данных
+
+```typescript
+// tests/factories/user.factory.ts
+import { faker } from '@faker-js/faker';
+
+export function createUser(overrides: Partial<User> = {}): User {
+  return {
+    id: faker.string.uuid(),
+    email: faker.internet.email(),
+    name: faker.person.fullName(),
+    role: 'USER',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...overrides,
+  };
+}
+
+export function createProduct(overrides: Partial<Product> = {}): Product {
+  return {
+    id: faker.string.uuid(),
+    name: faker.commerce.productName(),
+    price: faker.number.int({ min: 100, max: 100000 }),
+    stock: faker.number.int({ min: 0, max: 100 }),
+    isActive: true,
+    ...overrides,
+  };
+}
+
+// Использование
+const user = createUser({ role: 'ADMIN' });
+const product = createProduct({ stock: 0 });
+```
+
+---
+
+## 📋 СТРУКТУРА ТЕСТОВ
+
+### Расположение файлов
+
+```
+src/
+├── modules/
+│   └── products/
+│       ├── products.service.ts
+│       ├── products.service.spec.ts      # Unit тест рядом
+│       ├── products.controller.ts
+│       └── products.controller.spec.ts
+│
+├── lib/
+│   └── utils/
+│       ├── format.ts
+│       └── format.test.ts                # Unit тест рядом
+│
+tests/
+├── integration/                          # Integration тесты
+│   ├── api/
+│   │   └── products.test.ts
+│   └── services/
+│       └── order-flow.test.ts
+│
+├── e2e/                                  # E2E тесты
+│   ├── checkout.spec.ts
+│   └── auth.spec.ts
+│
+├── fixtures/                             # Тестовые данные
+│   ├── products.json
+│   └── users.json
+│
+├── factories/                            # Фабрики
+│   ├── user.factory.ts
+│   └── product.factory.ts
+│
+└── setup/                                # Настройка
+    ├── jest.setup.ts
+    └── test-utils.tsx
+```
+
+---
+
+## 📋 CHECKLIST
+
+### Перед мержем
+
+- [ ] Все тесты проходят
+- [ ] Новая бизнес-логика покрыта тестами
+- [ ] API endpoints протестированы
+- [ ] Edge cases обработаны
+- [ ] Нет console.log в тестах
+- [ ] Тесты изолированы (не зависят друг от друга)
+
+### Качество тестов
+
+- [ ] Тест тестирует одно поведение
+- [ ] Имя теста описывает ожидаемое поведение
+- [ ] Используется AAA паттерн
+- [ ] Моки настроены правильно
+- [ ] Нет flaky тестов
+
+---
+
+**Версия:** 1.0
+**Дата:** 2025-01-31

@@ -1,0 +1,463 @@
+---
+description: Правила безопасности. КРИТИЧЕСКИ ВАЖНО. Применяется ко всему коду.
+globs: ["**/*"]
+alwaysApply: false
+---
+
+# ПРАВИЛА БЕЗОПАСНОСТИ
+
+> Безопасность — не опция, а требование. Эти правила ОБЯЗАТЕЛЬНЫ.
+
+---
+
+## 🚨 КРИТИЧЕСКИЕ ПРАВИЛА
+
+### НИКОГДА не делай
+
+```typescript
+// ❌ НИКОГДА — секреты в коде
+const API_KEY = 'sk_live_abc123';
+const DB_PASSWORD = 'mypassword';
+
+// ❌ НИКОГДА — SQL инъекции
+const query = `SELECT * FROM users WHERE id = ${userId}`;
+await db.$queryRawUnsafe(query);
+
+// ❌ НИКОГДА — eval и подобные
+eval(userInput);
+new Function(userInput)();
+
+// ❌ НИКОГДА — отключение безопасности
+app.use(cors({ origin: '*' })); // Только для dev!
+// CSRF отключен
+
+// ❌ НИКОГДА — логирование секретов
+console.log('Password:', password);
+logger.info({ token: accessToken });
+```
+
+---
+
+## 🔐 АУТЕНТИФИКАЦИЯ
+
+### Пароли
+
+```typescript
+// ✅ Хэширование паролей
+import { hash, verify } from 'argon2';
+
+// Хэширование при регистрации
+const passwordHash = await hash(password, {
+  type: argon2id,
+  memoryCost: 65536,  // 64 MB
+  timeCost: 3,
+  parallelism: 4,
+});
+
+// Проверка при логине
+const isValid = await verify(user.passwordHash, password);
+
+// ❌ НИКОГДА
+const passwordHash = md5(password);     // Слабый алгоритм
+const passwordHash = sha256(password);  // Без salt
+```
+
+### JWT Токены
+
+```typescript
+// ✅ Правильная настройка JWT
+const accessToken = jwt.sign(
+  { userId: user.id, role: user.role },
+  process.env.JWT_SECRET,
+  { 
+    expiresIn: '15m',           // Короткий срок
+    algorithm: 'RS256',         // Асимметричный алгоритм
+    issuer: 'api.example.com',
+    audience: 'example.com',
+  }
+);
+
+// Refresh token — длинный срок, хранить в БД
+const refreshToken = jwt.sign(
+  { userId: user.id, tokenId: uuid() },
+  process.env.JWT_REFRESH_SECRET,
+  { expiresIn: '7d' }
+);
+
+// ❌ НЕПРАВИЛЬНО
+const token = jwt.sign(payload, 'secret'); // Слабый секрет
+jwt.sign(payload, secret, { expiresIn: '30d' }); // Слишком долго для access
+```
+
+### Сессии
+
+```typescript
+// ✅ Безопасные куки для сессий
+res.cookie('sessionId', sessionId, {
+  httpOnly: true,     // Недоступен из JS
+  secure: true,       // Только HTTPS
+  sameSite: 'strict', // Защита от CSRF
+  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 дней
+  path: '/',
+  domain: '.example.com',
+});
+```
+
+---
+
+## 🛡️ ЗАЩИТА ОТ АТАК
+
+### XSS (Cross-Site Scripting)
+
+```typescript
+// ✅ Экранирование вывода
+import { escape } from 'html-escaper';
+
+const safeHtml = escape(userInput);
+
+// ✅ Content Security Policy
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", "https://api.example.com"],
+    },
+  },
+}));
+
+// ✅ React автоматически экранирует
+return <div>{userInput}</div>; // Безопасно
+
+// ❌ ОПАСНО — dangerouslySetInnerHTML
+<div dangerouslySetInnerHTML={{ __html: userInput }} />
+```
+
+### CSRF (Cross-Site Request Forgery)
+
+```typescript
+// ✅ CSRF токены для форм
+import csrf from 'csurf';
+
+app.use(csrf({ cookie: true }));
+
+// В форме
+<input type="hidden" name="_csrf" value={csrfToken} />
+
+// ✅ SameSite cookies
+res.cookie('session', value, { sameSite: 'strict' });
+```
+
+### SQL Injection
+
+```typescript
+// ✅ Prisma автоматически защищает
+const user = await prisma.user.findFirst({
+  where: { email: userInput }, // Безопасно
+});
+
+// ✅ Параметризованные запросы
+const result = await prisma.$queryRaw`
+  SELECT * FROM users WHERE email = ${userInput}
+`; // Безопасно — Prisma экранирует
+
+// ❌ НИКОГДА
+await prisma.$queryRawUnsafe(
+  `SELECT * FROM users WHERE email = '${userInput}'`
+);
+```
+
+### NoSQL Injection
+
+```typescript
+// ✅ Валидация типов
+const userId = z.string().uuid().parse(userInput);
+
+// ❌ ОПАСНО — без валидации
+const user = await db.findOne({ 
+  _id: userInput // Может быть { $ne: null }
+});
+```
+
+---
+
+## 🔒 АВТОРИЗАЦИЯ
+
+### RBAC (Role-Based Access Control)
+
+```typescript
+// ✅ Проверка ролей
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('admin', 'manager')
+@Delete(':id')
+async delete(@Param('id') id: string) {
+  return this.service.delete(id);
+}
+
+// ✅ Проверка владельца ресурса
+async updateOrder(orderId: string, userId: string, data: UpdateOrderDto) {
+  const order = await this.prisma.order.findUnique({
+    where: { id: orderId },
+  });
+  
+  if (!order) {
+    throw new NotFoundException();
+  }
+  
+  // Проверка владельца
+  if (order.userId !== userId) {
+    throw new ForbiddenException('You can only edit your own orders');
+  }
+  
+  return this.prisma.order.update({
+    where: { id: orderId },
+    data,
+  });
+}
+```
+
+### Принцип минимальных привилегий
+
+```typescript
+// ✅ Возвращай только нужные поля
+const user = await prisma.user.findUnique({
+  where: { id },
+  select: {
+    id: true,
+    name: true,
+    email: true,
+    // НЕ возвращай: passwordHash, role, internalNotes
+  },
+});
+
+// ✅ Разные DTO для разных уровней доступа
+export class UserPublicDto {
+  id: string;
+  name: string;
+}
+
+export class UserPrivateDto extends UserPublicDto {
+  email: string;
+  phone: string;
+}
+
+export class UserAdminDto extends UserPrivateDto {
+  role: string;
+  createdAt: Date;
+  lastLoginAt: Date;
+}
+```
+
+---
+
+## 🔑 СЕКРЕТЫ
+
+### Хранение секретов
+
+```bash
+# ✅ Environment variables
+DATABASE_URL=postgresql://...
+JWT_SECRET=very-long-random-string
+API_KEY=sk_live_...
+
+# .env файл в .gitignore
+# ❌ НИКОГДА не коммить .env
+
+# ✅ Production — используй secrets manager
+# - AWS Secrets Manager
+# - HashiCorp Vault
+# - Kubernetes Secrets
+```
+
+### Генерация секретов
+
+```bash
+# ✅ Криптографически стойкие секреты
+openssl rand -base64 32  # Для JWT_SECRET
+openssl rand -hex 32     # Для API ключей
+
+# ❌ НИКОГДА
+JWT_SECRET=secret
+JWT_SECRET=12345
+```
+
+### Валидация env переменных
+
+```typescript
+// ✅ Проверка при старте
+import { z } from 'zod';
+
+const envSchema = z.object({
+  DATABASE_URL: z.string().url(),
+  JWT_SECRET: z.string().min(32),
+  NODE_ENV: z.enum(['development', 'production', 'test']),
+});
+
+const env = envSchema.parse(process.env);
+
+export default env;
+```
+
+---
+
+## 📝 ВАЛИДАЦИЯ ВХОДНЫХ ДАННЫХ
+
+### Общие правила
+
+```typescript
+// ✅ Валидируй ВСЁ на входе
+import { z } from 'zod';
+
+const createUserSchema = z.object({
+  email: z.string().email().max(255),
+  password: z.string().min(8).max(100),
+  name: z.string().min(1).max(100).optional(),
+});
+
+// ✅ Санитизация
+const sanitizedInput = input
+  .trim()
+  .replace(/[<>]/g, ''); // Удаляем HTML теги
+
+// ✅ Ограничения размера
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ limit: '1mb', extended: true }));
+```
+
+### Загрузка файлов
+
+```typescript
+// ✅ Проверка типа и размера
+const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const MAX_SIZE = 5 * 1024 * 1024; // 5MB
+
+async function uploadFile(file: Express.Multer.File) {
+  // Проверка MIME type
+  if (!ALLOWED_TYPES.includes(file.mimetype)) {
+    throw new BadRequestException('Invalid file type');
+  }
+  
+  // Проверка размера
+  if (file.size > MAX_SIZE) {
+    throw new BadRequestException('File too large');
+  }
+  
+  // Генерируй новое имя файла
+  const filename = `${uuid()}${path.extname(file.originalname)}`;
+  
+  // НЕ используй originalname напрямую!
+}
+```
+
+---
+
+## 🌐 HTTPS И ЗАГОЛОВКИ
+
+### Security Headers
+
+```typescript
+// ✅ Используй helmet
+import helmet from 'helmet';
+
+app.use(helmet());
+
+// Или настрой вручную
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  res.setHeader('Content-Security-Policy', "default-src 'self'");
+  next();
+});
+```
+
+### CORS
+
+```typescript
+// ✅ Правильная настройка CORS
+app.use(cors({
+  origin: [
+    'https://example.com',
+    'https://admin.example.com',
+  ],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+  maxAge: 86400, // 24 часа
+}));
+
+// ❌ НИКОГДА в production
+app.use(cors({ origin: '*' }));
+```
+
+---
+
+## 📊 ЛОГИРОВАНИЕ
+
+### Что логировать
+
+```typescript
+// ✅ Логируй безопасные данные
+logger.info('User logged in', { userId: user.id, ip: req.ip });
+logger.warn('Failed login attempt', { email, ip: req.ip, attempts });
+logger.error('Payment failed', { orderId, errorCode });
+
+// ❌ НИКОГДА не логируй
+logger.info('Login', { email, password }); // Пароль!
+logger.debug('Token', { accessToken });    // Токен!
+logger.info('Card', { cardNumber });       // Платёжные данные!
+```
+
+### Маскирование данных
+
+```typescript
+// ✅ Маскируй чувствительные данные
+function maskEmail(email: string): string {
+  const [local, domain] = email.split('@');
+  return `${local[0]}***@${domain}`;
+}
+
+function maskCard(card: string): string {
+  return `****${card.slice(-4)}`;
+}
+
+logger.info('Payment processed', {
+  email: maskEmail(user.email),
+  card: maskCard(cardNumber),
+});
+```
+
+---
+
+## 📋 SECURITY CHECKLIST
+
+### Перед деплоем
+
+- [ ] Все секреты в environment variables
+- [ ] .env в .gitignore
+- [ ] HTTPS включён
+- [ ] Security headers настроены
+- [ ] CORS ограничен
+- [ ] Rate limiting включён
+- [ ] Валидация всех входных данных
+- [ ] Пароли хэшируются (argon2/bcrypt)
+- [ ] JWT с коротким сроком жизни
+- [ ] Логирование без секретов
+- [ ] SQL injection защита (ORM)
+- [ ] XSS защита (CSP)
+- [ ] CSRF защита
+
+### Регулярно
+
+- [ ] Обновление зависимостей (npm audit)
+- [ ] Проверка на уязвимости
+- [ ] Ревью прав доступа
+- [ ] Проверка логов
+
+---
+
+**Версия:** 1.0
+**Дата:** 2025-01-31

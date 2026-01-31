@@ -1,0 +1,445 @@
+---
+description: Конфигурация для КРУПНЫХ проектов (6+ месяцев, 5+ разработчиков). Monorepo с модульной архитектурой.
+globs: ["**/*"]
+alwaysApply: false
+---
+
+# КРУПНЫЙ ПРОЕКТ (SIZE C)
+
+> Monorepo с чёткими границами модулей. 6+ месяцев, 5+ разработчиков.
+
+---
+
+## 🎯 ХАРАКТЕРИСТИКИ
+
+| Параметр | Значение |
+|----------|----------|
+| Срок разработки | 6+ месяцев |
+| Команда | 5+ человек |
+| Количество фич | 50+ |
+| Сложность | Высокая |
+| Масштабирование | Обязательно |
+
+---
+
+## 📁 СТРУКТУРА ПРОЕКТА (MONOREPO)
+
+```
+project/
+├── apps/
+│   ├── web/                       # Frontend (Next.js)
+│   │   ├── src/
+│   │   │   ├── app/              # App Router
+│   │   │   ├── features/         # Feature modules
+│   │   │   ├── shared/           # App-specific shared
+│   │   │   └── config/
+│   │   ├── package.json
+│   │   └── tsconfig.json
+│   │
+│   ├── api/                       # Backend (NestJS)
+│   │   ├── src/
+│   │   │   ├── modules/          # Feature modules
+│   │   │   │   ├── auth/
+│   │   │   │   ├── users/
+│   │   │   │   ├── products/
+│   │   │   │   └── orders/
+│   │   │   ├── common/           # Guards, filters, etc.
+│   │   │   ├── config/
+│   │   │   └── main.ts
+│   │   ├── package.json
+│   │   └── tsconfig.json
+│   │
+│   └── admin/                     # Admin panel (опционально)
+│       └── ...
+│
+├── packages/
+│   ├── ui/                        # UI библиотека
+│   │   ├── src/
+│   │   │   ├── Button/
+│   │   │   │   ├── Button.tsx
+│   │   │   │   ├── Button.test.tsx
+│   │   │   │   └── index.ts
+│   │   │   ├── Modal/
+│   │   │   ├── Form/
+│   │   │   └── index.ts
+│   │   ├── package.json
+│   │   └── tsconfig.json
+│   │
+│   ├── domain/                    # 🔥 Чистая бизнес-логика
+│   │   ├── src/
+│   │   │   ├── entities/         # Доменные сущности
+│   │   │   │   ├── Order.ts
+│   │   │   │   ├── Product.ts
+│   │   │   │   └── User.ts
+│   │   │   ├── use-cases/        # Бизнес-сценарии
+│   │   │   │   ├── CreateOrder.ts
+│   │   │   │   ├── CalculateDiscount.ts
+│   │   │   │   └── ValidateOrder.ts
+│   │   │   ├── rules/            # Бизнес-правила
+│   │   │   │   ├── pricing.ts
+│   │   │   │   └── shipping.ts
+│   │   │   └── index.ts
+│   │   ├── package.json
+│   │   └── tsconfig.json
+│   │
+│   ├── shared/                    # Общие утилиты
+│   │   ├── src/
+│   │   │   ├── utils/
+│   │   │   ├── types/
+│   │   │   └── constants/
+│   │   └── package.json
+│   │
+│   ├── contracts/                 # API контракты
+│   │   ├── src/
+│   │   │   ├── api/              # OpenAPI schemas
+│   │   │   ├── events/           # Event schemas
+│   │   │   └── dto/              # Shared DTOs
+│   │   └── package.json
+│   │
+│   └── config/                    # Общие конфиги
+│       ├── eslint/
+│       ├── typescript/
+│       └── tailwind/
+│
+├── infrastructure/
+│   ├── docker/
+│   │   ├── docker-compose.yml
+│   │   ├── Dockerfile.web
+│   │   └── Dockerfile.api
+│   ├── kubernetes/               # K8s манифесты
+│   └── terraform/                # IaC
+│
+├── docs/
+│   ├── architecture/
+│   │   ├── 01-OVERVIEW.md
+│   │   ├── 02-MODULES.md
+│   │   ├── 03-DATA_FLOW.md
+│   │   └── diagrams/
+│   ├── decisions/                # ADRs
+│   │   ├── ADR-001-monorepo.md
+│   │   ├── ADR-002-clean-architecture.md
+│   │   └── template.md
+│   ├── api/
+│   │   └── openapi.yaml
+│   ├── guides/
+│   │   ├── setup.md
+│   │   ├── deployment.md
+│   │   └── contributing.md
+│   ├── PROGRESS.md
+│   ├── DECISIONS.md
+│   └── CHANGELOG.md
+│
+├── scripts/
+│   ├── setup.sh
+│   ├── deploy.sh
+│   └── generate-types.ts
+│
+├── turbo.json                    # Turborepo config
+├── pnpm-workspace.yaml
+└── package.json
+```
+
+---
+
+## 📝 ДОКУМЕНТАЦИЯ
+
+### Обязательные файлы (15+)
+
+#### Архитектура (docs/architecture/)
+- 01-OVERVIEW.md — Обзор системы
+- 02-MODULES.md — Описание модулей
+- 03-DATA_FLOW.md — Потоки данных
+- diagrams/ — Диаграммы
+
+#### ADR (docs/decisions/)
+- ADR-001-*.md — Решение 1
+- ADR-002-*.md — Решение 2
+- template.md — Шаблон ADR
+
+#### Гайды (docs/guides/)
+- setup.md — Настройка окружения
+- deployment.md — Деплой
+- contributing.md — Как контрибьютить
+
+### Шаблон ADR
+
+```markdown
+# ADR-XXX: [Название]
+
+**Статус:** [Proposed | Accepted | Deprecated | Superseded]
+**Дата:** YYYY-MM-DD
+**Авторы:** [@username]
+
+## Контекст
+
+Какую проблему решаем? Какие ограничения есть?
+
+## Решение
+
+Что мы решили сделать?
+
+## Альтернативы
+
+### Вариант A
+- Плюсы: ...
+- Минусы: ...
+
+### Вариант B (выбран)
+- Плюсы: ...
+- Минусы: ...
+
+## Последствия
+
+### Позитивные
+- ...
+
+### Негативные
+- ...
+
+## Связанные решения
+
+- ADR-XXX: ...
+```
+
+---
+
+## 🏗️ ПРАВИЛА ПАКЕТОВ
+
+### Зависимости между пакетами
+
+```
+apps/web → packages/ui, packages/shared, packages/contracts
+apps/api → packages/domain, packages/shared, packages/contracts
+
+packages/ui → packages/shared (только types/utils)
+packages/domain → НИЧЕГО (чистая бизнес-логика!)
+packages/shared → НИЧЕГО
+packages/contracts → packages/shared (только types)
+```
+
+### Package.json каждого пакета
+
+```json
+// packages/domain/package.json
+{
+  "name": "@project/domain",
+  "version": "1.0.0",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "test": "vitest",
+    "typecheck": "tsc --noEmit"
+  }
+}
+```
+
+### Чистый Domain Layer
+
+```typescript
+// packages/domain/src/entities/Order.ts
+// НЕТ зависимостей от Prisma, NestJS, React!
+
+export interface OrderItem {
+  productId: string;
+  quantity: number;
+  price: number;
+}
+
+export class Order {
+  constructor(
+    public readonly id: string,
+    public readonly items: OrderItem[],
+    public readonly status: OrderStatus,
+    public readonly createdAt: Date,
+  ) {}
+
+  get total(): number {
+    return this.items.reduce(
+      (sum, item) => sum + item.price * item.quantity,
+      0
+    );
+  }
+
+  canBeCancelled(): boolean {
+    return ['pending', 'confirmed'].includes(this.status);
+  }
+
+  addItem(item: OrderItem): Order {
+    return new Order(
+      this.id,
+      [...this.items, item],
+      this.status,
+      this.createdAt,
+    );
+  }
+}
+```
+
+---
+
+## 🧪 ТЕСТИРОВАНИЕ
+
+### Стратегия
+
+| Тип | Где | Покрытие |
+|-----|-----|----------|
+| Unit | packages/domain | ≥ 90% |
+| Unit | packages/shared | ≥ 80% |
+| Integration | apps/api | 100% endpoints |
+| Component | packages/ui | Storybook + tests |
+| E2E | apps/web | Критичные flows |
+
+### Тестирование domain
+
+```typescript
+// packages/domain/src/entities/Order.test.ts
+describe('Order', () => {
+  describe('total', () => {
+    it('should calculate total correctly', () => {
+      const order = new Order('1', [
+        { productId: 'p1', quantity: 2, price: 1000 },
+        { productId: 'p2', quantity: 1, price: 500 },
+      ], 'pending', new Date());
+
+      expect(order.total).toBe(2500);
+    });
+  });
+
+  describe('canBeCancelled', () => {
+    it.each(['pending', 'confirmed'])('should return true for %s', (status) => {
+      const order = new Order('1', [], status as OrderStatus, new Date());
+      expect(order.canBeCancelled()).toBe(true);
+    });
+
+    it.each(['shipped', 'delivered'])('should return false for %s', (status) => {
+      const order = new Order('1', [], status as OrderStatus, new Date());
+      expect(order.canBeCancelled()).toBe(false);
+    });
+  });
+});
+```
+
+---
+
+## ⚙️ TURBOREPO
+
+### turbo.json
+
+```json
+{
+  "$schema": "https://turbo.build/schema.json",
+  "pipeline": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", ".next/**"]
+    },
+    "test": {
+      "dependsOn": ["^build"]
+    },
+    "lint": {},
+    "typecheck": {
+      "dependsOn": ["^build"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    }
+  }
+}
+```
+
+### Команды
+
+```bash
+# Все приложения
+pnpm turbo build
+pnpm turbo test
+pnpm turbo lint
+
+# Конкретное приложение
+pnpm turbo build --filter=web
+pnpm turbo dev --filter=api
+
+# С зависимостями
+pnpm turbo build --filter=web...
+```
+
+---
+
+## 🚀 CI/CD
+
+### GitHub Actions
+
+```yaml
+# .github/workflows/ci.yml
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+      
+      - run: pnpm install
+      - run: pnpm turbo lint
+      - run: pnpm turbo typecheck
+      - run: pnpm turbo test
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+      
+      - run: pnpm install
+      - run: pnpm turbo build
+```
+
+---
+
+## 📋 CHECKLIST
+
+### Перед началом
+- [ ] Monorepo структура создана
+- [ ] Turborepo настроен
+- [ ] pnpm workspace настроен
+- [ ] Все пакеты инициализированы
+- [ ] CI/CD настроен
+- [ ] Документация создана
+- [ ] ADR template готов
+
+### Новый пакет
+- [ ] Создана папка в packages/
+- [ ] package.json настроен
+- [ ] Зависимости правильные
+- [ ] Экспорты настроены
+- [ ] Тесты написаны
+- [ ] Документация обновлена
+
+### Релиз
+- [ ] Все тесты проходят
+- [ ] ADR для новых решений
+- [ ] CHANGELOG обновлён
+- [ ] Версии пакетов обновлены
+- [ ] Документация актуальна
+
+---
+
+**Версия:** 1.0
+**Дата:** 2025-01-31

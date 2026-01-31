@@ -1,0 +1,461 @@
+---
+description: Общие стандарты кодирования для всех языков и технологий.
+globs: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"]
+alwaysApply: false
+---
+
+# СТАНДАРТЫ КОДИРОВАНИЯ
+
+> Единые правила для чистого, читаемого и поддерживаемого кода.
+
+---
+
+## 📏 РАЗМЕРЫ И ОГРАНИЧЕНИЯ
+
+### Жёсткие лимиты
+
+| Метрика | Лимит | Действие при превышении |
+|---------|-------|------------------------|
+| Строк в функции | ≤ 50 | Разбить на подфункции |
+| Строк в файле | ≤ 300 | Разбить на модули |
+| Параметров функции | ≤ 4 | Использовать объект |
+| Уровней вложенности | ≤ 3 | Early returns |
+| Символов в строке | ≤ 100 | Перенос |
+
+### Примеры
+
+```typescript
+// ❌ ПЛОХО — слишком много параметров
+function createUser(
+  name: string,
+  email: string,
+  age: number,
+  address: string,
+  phone: string,
+  role: string
+) { ... }
+
+// ✅ ХОРОШО — объект параметров
+interface CreateUserParams {
+  name: string;
+  email: string;
+  age: number;
+  address: string;
+  phone?: string;
+  role?: UserRole;
+}
+
+function createUser(params: CreateUserParams) { ... }
+```
+
+```typescript
+// ❌ ПЛОХО — глубокая вложенность
+function processOrder(order: Order) {
+  if (order) {
+    if (order.status === 'pending') {
+      if (order.items.length > 0) {
+        if (order.total > 0) {
+          // уровень 4 — слишком глубоко!
+        }
+      }
+    }
+  }
+}
+
+// ✅ ХОРОШО — early returns
+function processOrder(order: Order) {
+  if (!order) throw new Error('Order required');
+  if (order.status !== 'pending') throw new Error('Invalid status');
+  if (order.items.length === 0) throw new Error('Empty order');
+  if (order.total <= 0) throw new Error('Invalid total');
+  
+  // основная логика на уровне 1
+  return executeOrder(order);
+}
+```
+
+---
+
+## 🏷️ ИМЕНОВАНИЕ
+
+### Общие правила
+
+1. **Имя должно отвечать на вопрос "ЧТО это?"**
+2. **Имя функции должно отвечать на вопрос "ЧТО делает?"**
+3. **Избегай аббревиатур** (кроме общепринятых: id, url, api)
+4. **Не используй венгерскую нотацию** (strName, arrItems)
+
+### Таблица именования
+
+| Что | Стиль | Пример | Антипример |
+|-----|-------|--------|------------|
+| Переменные | camelCase | `userName`, `isActive` | `user_name`, `UserName` |
+| Функции | camelCase + глагол | `getUser`, `createOrder` | `user`, `order` |
+| Классы | PascalCase | `UserService` | `userService` |
+| Интерфейсы | PascalCase | `UserData` | `IUserData` |
+| Типы | PascalCase | `OrderStatus` | `TOrderStatus` |
+| Константы | UPPER_SNAKE | `MAX_RETRIES` | `maxRetries` |
+| Enum | PascalCase + UPPER values | `Status.ACTIVE` | `Status.active` |
+| Приватные поля | camelCase + underscore | `_cache` | `privateCache` |
+| Boolean | is/has/can/should | `isValid`, `hasPermission` | `valid`, `permission` |
+
+### Глаголы для функций
+
+| Действие | Префикс | Пример |
+|----------|---------|--------|
+| Получить | get | `getUser`, `getProducts` |
+| Установить | set | `setStatus`, `setConfig` |
+| Создать | create | `createOrder`, `createUser` |
+| Обновить | update | `updateProfile`, `updateOrder` |
+| Удалить | delete/remove | `deleteUser`, `removeItem` |
+| Проверить | is/has/can | `isValid`, `hasAccess`, `canEdit` |
+| Преобразовать | to/from/parse | `toJSON`, `fromDTO`, `parseDate` |
+| Обработать | handle/process | `handleSubmit`, `processPayment` |
+| Валидировать | validate | `validateEmail`, `validateOrder` |
+| Вычислить | calculate/compute | `calculateTotal`, `computeDiscount` |
+
+---
+
+## 📝 КОММЕНТАРИИ
+
+### Когда комментировать
+
+```typescript
+// ✅ ХОРОШО — объяснение ПОЧЕМУ
+// Используем setTimeout вместо requestAnimationFrame
+// из-за бага в Safari с анимацией модальных окон
+setTimeout(() => closeModal(), 0);
+
+// ✅ ХОРОШО — предупреждение
+// ВНИМАНИЕ: порядок важен! Сначала валидация, потом сохранение
+await validateOrder(order);
+await saveOrder(order);
+
+// ✅ ХОРОШО — TODO с контекстом
+// TODO: Заменить на API call после готовности бэкенда
+const products = mockProducts;
+```
+
+### Когда НЕ комментировать
+
+```typescript
+// ❌ ПЛОХО — очевидный код
+// Увеличиваем счётчик на 1
+counter++;
+
+// ❌ ПЛОХО — код должен быть самодокументируемым
+// Получаем имя пользователя
+const n = u.name;
+
+// ✅ ХОРОШО — имя говорит само за себя
+const userName = user.name;
+```
+
+### JSDoc для публичных функций
+
+```typescript
+/**
+ * Рассчитывает итоговую стоимость заказа с учётом скидок и доставки.
+ * 
+ * @param items - Товары в заказе
+ * @param discount - Скидка в процентах (0-100)
+ * @param shippingCost - Стоимость доставки
+ * @returns Итоговая сумма заказа
+ * 
+ * @example
+ * const total = calculateOrderTotal(items, 10, 500);
+ * // total = (сумма items * 0.9) + 500
+ */
+function calculateOrderTotal(
+  items: OrderItem[],
+  discount: number,
+  shippingCost: number
+): number {
+  const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const discountAmount = subtotal * (discount / 100);
+  return subtotal - discountAmount + shippingCost;
+}
+```
+
+---
+
+## 🔧 ФУНКЦИИ
+
+### Чистые функции (предпочтительно)
+
+```typescript
+// ✅ Чистая функция — нет side effects, детерминированный результат
+function calculateDiscount(price: number, percentage: number): number {
+  return price * (percentage / 100);
+}
+
+// ❌ Нечистая функция — изменяет внешнее состояние
+let totalDiscount = 0;
+function calculateDiscount(price: number, percentage: number): number {
+  const discount = price * (percentage / 100);
+  totalDiscount += discount; // side effect!
+  return discount;
+}
+```
+
+### Одна функция — одна задача
+
+```typescript
+// ❌ ПЛОХО — функция делает слишком много
+async function processOrder(order: Order) {
+  // Валидация (10 строк)
+  // Расчёт цены (15 строк)
+  // Проверка остатков (10 строк)
+  // Создание платежа (20 строк)
+  // Отправка email (15 строк)
+  // Логирование (10 строк)
+}
+
+// ✅ ХОРОШО — декомпозиция
+async function processOrder(order: Order) {
+  const validatedOrder = await validateOrder(order);
+  const pricedOrder = calculateOrderTotal(validatedOrder);
+  await reserveStock(pricedOrder);
+  const payment = await createPayment(pricedOrder);
+  await sendConfirmationEmail(pricedOrder);
+  await logOrderCreated(pricedOrder);
+  return { order: pricedOrder, payment };
+}
+```
+
+### Параметры по умолчанию
+
+```typescript
+// ✅ ХОРОШО — значения по умолчанию
+function fetchProducts(options: {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+} = {}) {
+  const { page = 1, limit = 20, sortBy = 'createdAt' } = options;
+  // ...
+}
+
+// Вызов
+fetchProducts(); // все значения по умолчанию
+fetchProducts({ page: 2 }); // только page
+fetchProducts({ page: 2, limit: 50 }); // page и limit
+```
+
+---
+
+## 🚫 АНТИПАТТЕРНЫ
+
+### Magic Numbers/Strings
+
+```typescript
+// ❌ ПЛОХО
+if (user.age > 18) { ... }
+if (order.status === 'pending') { ... }
+setTimeout(callback, 86400000);
+
+// ✅ ХОРОШО
+const ADULT_AGE = 18;
+const OrderStatus = { PENDING: 'pending', ... } as const;
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+if (user.age > ADULT_AGE) { ... }
+if (order.status === OrderStatus.PENDING) { ... }
+setTimeout(callback, ONE_DAY_MS);
+```
+
+### Мутации
+
+```typescript
+// ❌ ПЛОХО — мутация аргумента
+function addItem(cart: Cart, item: Item) {
+  cart.items.push(item); // мутация!
+  return cart;
+}
+
+// ✅ ХОРОШО — иммутабельность
+function addItem(cart: Cart, item: Item): Cart {
+  return {
+    ...cart,
+    items: [...cart.items, item]
+  };
+}
+```
+
+### Вложенные тернарные операторы
+
+```typescript
+// ❌ ПЛОХО
+const status = isLoading ? 'loading' : isError ? 'error' : isSuccess ? 'success' : 'idle';
+
+// ✅ ХОРОШО
+function getStatus(state: State): Status {
+  if (state.isLoading) return 'loading';
+  if (state.isError) return 'error';
+  if (state.isSuccess) return 'success';
+  return 'idle';
+}
+```
+
+### Негативные условия
+
+```typescript
+// ❌ ПЛОХО — двойное отрицание
+if (!isNotValid) { ... }
+if (!user.isInactive) { ... }
+
+// ✅ ХОРОШО — позитивные условия
+if (isValid) { ... }
+if (user.isActive) { ... }
+```
+
+---
+
+## ✅ ЛУЧШИЕ ПРАКТИКИ
+
+### Destructuring
+
+```typescript
+// ✅ Деструктуризация объектов
+const { name, email, role } = user;
+
+// ✅ Деструктуризация с переименованием
+const { name: userName, email: userEmail } = user;
+
+// ✅ Деструктуризация в параметрах
+function greet({ name, title }: User) {
+  return `Hello, ${title} ${name}`;
+}
+```
+
+### Optional Chaining & Nullish Coalescing
+
+```typescript
+// ✅ Optional chaining
+const userName = user?.profile?.name;
+const firstItem = order?.items?.[0];
+
+// ✅ Nullish coalescing
+const limit = options.limit ?? 20; // 0 не заменится на 20
+const name = user.name ?? 'Anonymous';
+
+// ❌ Избегай || для значений по умолчанию
+const limit = options.limit || 20; // 0 заменится на 20!
+```
+
+### Template Literals
+
+```typescript
+// ✅ ХОРОШО
+const message = `Hello, ${user.name}! You have ${count} notifications.`;
+const url = `${API_BASE_URL}/users/${userId}/orders`;
+
+// ❌ ПЛОХО
+const message = 'Hello, ' + user.name + '! You have ' + count + ' notifications.';
+```
+
+### Array Methods
+
+```typescript
+// ✅ Функциональный подход
+const activeUsers = users
+  .filter(user => user.isActive)
+  .map(user => ({ id: user.id, name: user.name }))
+  .sort((a, b) => a.name.localeCompare(b.name));
+
+// ❌ Императивный подход
+const activeUsers = [];
+for (let i = 0; i < users.length; i++) {
+  if (users[i].isActive) {
+    activeUsers.push({ id: users[i].id, name: users[i].name });
+  }
+}
+activeUsers.sort((a, b) => a.name.localeCompare(b.name));
+```
+
+---
+
+## 🔄 ОБРАБОТКА ОШИБОК
+
+### Try/Catch
+
+```typescript
+// ✅ ХОРОШО — конкретная обработка
+async function fetchUser(id: string): Promise<User> {
+  try {
+    const response = await api.get(`/users/${id}`);
+    return response.data;
+  } catch (error) {
+    if (error instanceof NotFoundError) {
+      throw new UserNotFoundError(id);
+    }
+    if (error instanceof NetworkError) {
+      throw new ServiceUnavailableError('User service unavailable');
+    }
+    throw error; // Пробросить неизвестную ошибку
+  }
+}
+
+// ❌ ПЛОХО — глушение ошибок
+async function fetchUser(id: string): Promise<User | null> {
+  try {
+    const response = await api.get(`/users/${id}`);
+    return response.data;
+  } catch (error) {
+    console.log(error); // Просто логируем и возвращаем null
+    return null;
+  }
+}
+```
+
+### Custom Errors
+
+```typescript
+// ✅ Кастомные ошибки для бизнес-логики
+class ValidationError extends Error {
+  constructor(
+    message: string,
+    public readonly field: string,
+    public readonly code: string
+  ) {
+    super(message);
+    this.name = 'ValidationError';
+  }
+}
+
+class NotFoundError extends Error {
+  constructor(
+    public readonly resource: string,
+    public readonly id: string
+  ) {
+    super(`${resource} with id ${id} not found`);
+    this.name = 'NotFoundError';
+  }
+}
+
+// Использование
+throw new ValidationError('Invalid email format', 'email', 'INVALID_EMAIL');
+throw new NotFoundError('User', userId);
+```
+
+---
+
+## 📋 CHECKLIST КАЧЕСТВА КОДА
+
+### Перед коммитом
+
+- [ ] Нет `any` в TypeScript
+- [ ] Все функции ≤ 50 строк
+- [ ] Все файлы ≤ 300 строк
+- [ ] Вложенность ≤ 3 уровней
+- [ ] Нет magic numbers/strings
+- [ ] Нет закомментированного кода
+- [ ] Нет console.log (кроме debug)
+- [ ] Все переменные понятно названы
+- [ ] JSDoc для публичных функций
+- [ ] Обработаны все ошибки
+
+---
+
+**Версия:** 1.0
+**Дата:** 2025-01-31

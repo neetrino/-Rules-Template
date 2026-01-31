@@ -1,0 +1,613 @@
+---
+description: Правила Backend и NestJS. Применяется к серверному коду и API.
+globs: ["**/api/**", "**/server/**", "**/backend/**", "**/*.service.ts", "**/*.controller.ts", "**/*.module.ts"]
+alwaysApply: false
+---
+
+# ПРАВИЛА BACKEND И NESTJS
+
+> Чистая архитектура, тонкие контроллеры, толстые сервисы.
+
+---
+
+## 🎯 ГЛАВНЫЕ ПРИНЦИПЫ
+
+1. **Контроллеры тонкие** — только роутинг и валидация
+2. **Сервисы содержат логику** — вся бизнес-логика здесь
+3. **Dependency Injection** — всё через конструктор
+4. **DTO для всех данных** — валидация на входе
+
+---
+
+## 📁 СТРУКТУРА МОДУЛЯ
+
+### Стандартная структура NestJS модуля
+
+```
+src/
+├── modules/
+│   ├── products/
+│   │   ├── controllers/
+│   │   │   └── products.controller.ts
+│   │   ├── services/
+│   │   │   ├── products.service.ts
+│   │   │   └── products-search.service.ts
+│   │   ├── dto/
+│   │   │   ├── create-product.dto.ts
+│   │   │   ├── update-product.dto.ts
+│   │   │   └── product-query.dto.ts
+│   │   ├── entities/
+│   │   │   └── product.entity.ts
+│   │   ├── interfaces/
+│   │   │   └── product.interface.ts
+│   │   ├── products.module.ts
+│   │   └── index.ts
+│   │
+│   ├── orders/
+│   │   └── ...
+│   │
+│   └── auth/
+│       └── ...
+│
+├── common/
+│   ├── decorators/
+│   ├── guards/
+│   ├── interceptors/
+│   ├── filters/
+│   ├── pipes/
+│   └── utils/
+│
+├── config/
+│   └── configuration.ts
+│
+└── main.ts
+```
+
+---
+
+## 🎮 КОНТРОЛЛЕРЫ
+
+### Тонкий контроллер (правильно)
+
+```typescript
+// ✅ ПРАВИЛЬНО — контроллер только для роутинга
+@Controller('products')
+@ApiTags('products')
+export class ProductsController {
+  constructor(private readonly productsService: ProductsService) {}
+
+  @Get()
+  @ApiOperation({ summary: 'Получить список продуктов' })
+  async findAll(
+    @Query() query: ProductQueryDto
+  ): Promise<PaginatedResponse<Product>> {
+    return this.productsService.findAll(query);
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Получить продукт по ID' })
+  async findOne(
+    @Param('id', ParseUUIDPipe) id: string
+  ): Promise<Product> {
+    return this.productsService.findOne(id);
+  }
+
+  @Post()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @ApiOperation({ summary: 'Создать продукт' })
+  async create(
+    @Body() dto: CreateProductDto,
+    @CurrentUser() user: User
+  ): Promise<Product> {
+    return this.productsService.create(dto, user);
+  }
+
+  @Put(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  async update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateProductDto
+  ): Promise<Product> {
+    return this.productsService.update(id, dto);
+  }
+
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async remove(
+    @Param('id', ParseUUIDPipe) id: string
+  ): Promise<void> {
+    await this.productsService.remove(id);
+  }
+}
+```
+
+### Толстый контроллер (неправильно)
+
+```typescript
+// ❌ НЕПРАВИЛЬНО — логика в контроллере
+@Controller('products')
+export class ProductsController {
+  constructor(private readonly prisma: PrismaService) {}
+
+  @Get()
+  async findAll(@Query() query: any) {
+    // ❌ Прямой доступ к БД
+    const products = await this.prisma.product.findMany({
+      where: {
+        isActive: true,
+        category: query.category,
+      },
+      // ❌ Логика пагинации в контроллере
+      skip: (query.page - 1) * query.limit,
+      take: query.limit,
+    });
+    
+    // ❌ Трансформация данных в контроллере
+    return products.map(p => ({
+      ...p,
+      priceFormatted: `${p.price} ₽`,
+    }));
+  }
+}
+```
+
+---
+
+## ⚙️ СЕРВИСЫ
+
+### Структура сервиса
+
+```typescript
+@Injectable()
+export class ProductsService {
+  private readonly logger = new Logger(ProductsService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cacheService: CacheService,
+    private readonly searchService: SearchService,
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
+
+  // Публичные методы — бизнес-операции
+  async findAll(query: ProductQueryDto): Promise<PaginatedResponse<Product>> {
+    const { page = 1, limit = 20, category, search } = query;
+    
+    const where = this.buildWhereClause(query);
+    
+    const [items, total] = await Promise.all([
+      this.prisma.product.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.product.count({ where }),
+    ]);
+
+    return {
+      items,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async findOne(id: string): Promise<Product> {
+    // Сначала проверяем кэш
+    const cached = await this.cacheService.get<Product>(`product:${id}`);
+    if (cached) return cached;
+
+    const product = await this.prisma.product.findUnique({
+      where: { id },
+      include: { category: true, variants: true },
+    });
+
+    if (!product) {
+      throw new NotFoundException(`Product with ID ${id} not found`);
+    }
+
+    // Кэшируем
+    await this.cacheService.set(`product:${id}`, product, 3600);
+
+    return product;
+  }
+
+  async create(dto: CreateProductDto, user: User): Promise<Product> {
+    // Валидация бизнес-правил
+    await this.validateCategory(dto.categoryId);
+    
+    const product = await this.prisma.product.create({
+      data: {
+        ...dto,
+        createdBy: user.id,
+      },
+    });
+
+    // Индексация для поиска
+    await this.searchService.index('products', product);
+    
+    // Событие
+    this.eventEmitter.emit('product.created', { product, user });
+    
+    this.logger.log(`Product created: ${product.id} by user ${user.id}`);
+
+    return product;
+  }
+
+  async update(id: string, dto: UpdateProductDto): Promise<Product> {
+    await this.findOne(id); // Проверяем что существует
+    
+    const product = await this.prisma.product.update({
+      where: { id },
+      data: dto,
+    });
+
+    // Инвалидируем кэш
+    await this.cacheService.del(`product:${id}`);
+    
+    // Обновляем индекс
+    await this.searchService.update('products', product);
+    
+    this.eventEmitter.emit('product.updated', { product });
+
+    return product;
+  }
+
+  async remove(id: string): Promise<void> {
+    await this.findOne(id);
+    
+    await this.prisma.product.delete({ where: { id } });
+    
+    await this.cacheService.del(`product:${id}`);
+    await this.searchService.remove('products', id);
+    
+    this.eventEmitter.emit('product.deleted', { id });
+  }
+
+  // Приватные методы — вспомогательная логика
+  private buildWhereClause(query: ProductQueryDto): Prisma.ProductWhereInput {
+    const where: Prisma.ProductWhereInput = {
+      isActive: true,
+    };
+
+    if (query.category) {
+      where.categoryId = query.category;
+    }
+
+    if (query.search) {
+      where.OR = [
+        { name: { contains: query.search, mode: 'insensitive' } },
+        { description: { contains: query.search, mode: 'insensitive' } },
+      ];
+    }
+
+    if (query.minPrice !== undefined || query.maxPrice !== undefined) {
+      where.price = {};
+      if (query.minPrice !== undefined) where.price.gte = query.minPrice;
+      if (query.maxPrice !== undefined) where.price.lte = query.maxPrice;
+    }
+
+    return where;
+  }
+
+  private async validateCategory(categoryId: string): Promise<void> {
+    const category = await this.prisma.category.findUnique({
+      where: { id: categoryId },
+    });
+    
+    if (!category) {
+      throw new BadRequestException(`Category ${categoryId} not found`);
+    }
+  }
+}
+```
+
+---
+
+## 📝 DTO (Data Transfer Objects)
+
+### Правила DTO
+
+```typescript
+// dto/create-product.dto.ts
+import { IsString, IsNumber, IsOptional, IsUUID, Min, MaxLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
+export class CreateProductDto {
+  @ApiProperty({ description: 'Название продукта', example: 'iPhone 15' })
+  @IsString()
+  @MaxLength(255)
+  name: string;
+
+  @ApiPropertyOptional({ description: 'Описание', example: 'Новый iPhone...' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(5000)
+  description?: string;
+
+  @ApiProperty({ description: 'Цена в копейках', example: 99900 })
+  @IsNumber()
+  @Min(0)
+  price: number;
+
+  @ApiProperty({ description: 'ID категории' })
+  @IsUUID()
+  categoryId: string;
+
+  @ApiPropertyOptional({ description: 'SKU', example: 'IPHONE-15-128' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  sku?: string;
+}
+
+// dto/update-product.dto.ts
+import { PartialType } from '@nestjs/swagger';
+
+export class UpdateProductDto extends PartialType(CreateProductDto) {}
+
+// dto/product-query.dto.ts
+export class ProductQueryDto {
+  @ApiPropertyOptional({ default: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  @ApiPropertyOptional({ default: 20, maximum: 100 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number = 20;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  category?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  minPrice?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  maxPrice?: number;
+}
+```
+
+---
+
+## 🛡️ GUARDS И MIDDLEWARE
+
+### Auth Guard
+
+```typescript
+// common/guards/jwt-auth.guard.ts
+@Injectable()
+export class JwtAuthGuard extends AuthGuard('jwt') {
+  canActivate(context: ExecutionContext) {
+    return super.canActivate(context);
+  }
+
+  handleRequest<TUser = User>(err: any, user: TUser): TUser {
+    if (err || !user) {
+      throw new UnauthorizedException('Invalid or expired token');
+    }
+    return user;
+  }
+}
+
+// common/guards/roles.guard.ts
+@Injectable()
+export class RolesGuard implements CanActivate {
+  constructor(private reflector: Reflector) {}
+
+  canActivate(context: ExecutionContext): boolean {
+    const requiredRoles = this.reflector.getAllAndOverride<string[]>('roles', [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+
+    if (!requiredRoles) return true;
+
+    const request = context.switchToHttp().getRequest();
+    const user = request.user;
+
+    return requiredRoles.some(role => user.roles?.includes(role));
+  }
+}
+```
+
+### Custom Decorators
+
+```typescript
+// common/decorators/current-user.decorator.ts
+export const CurrentUser = createParamDecorator(
+  (data: keyof User | undefined, ctx: ExecutionContext) => {
+    const request = ctx.switchToHttp().getRequest();
+    const user = request.user;
+    return data ? user?.[data] : user;
+  },
+);
+
+// common/decorators/roles.decorator.ts
+export const Roles = (...roles: string[]) => SetMetadata('roles', roles);
+
+// Использование
+@Get('profile')
+@UseGuards(JwtAuthGuard)
+getProfile(@CurrentUser() user: User) {
+  return user;
+}
+
+@Post()
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('admin')
+create(@Body() dto: CreateDto) { ... }
+```
+
+---
+
+## ⚠️ ОБРАБОТКА ОШИБОК
+
+### Exception Filter
+
+```typescript
+// common/filters/http-exception.filter.ts
+@Catch()
+export class AllExceptionsFilter implements ExceptionFilter {
+  private readonly logger = new Logger(AllExceptionsFilter.name);
+
+  catch(exception: unknown, host: ArgumentsHost) {
+    const ctx = host.switchToHttp();
+    const response = ctx.getResponse<Response>();
+    const request = ctx.getRequest<Request>();
+
+    const { status, message, errors } = this.getErrorDetails(exception);
+
+    const errorResponse = {
+      statusCode: status,
+      timestamp: new Date().toISOString(),
+      path: request.url,
+      method: request.method,
+      message,
+      ...(errors && { errors }),
+    };
+
+    this.logger.error(
+      `${request.method} ${request.url} - ${status}`,
+      exception instanceof Error ? exception.stack : undefined,
+    );
+
+    response.status(status).json(errorResponse);
+  }
+
+  private getErrorDetails(exception: unknown) {
+    if (exception instanceof HttpException) {
+      const response = exception.getResponse();
+      return {
+        status: exception.getStatus(),
+        message: typeof response === 'string' 
+          ? response 
+          : (response as any).message,
+        errors: (response as any).errors,
+      };
+    }
+
+    if (exception instanceof Prisma.PrismaClientKnownRequestError) {
+      return this.handlePrismaError(exception);
+    }
+
+    return {
+      status: HttpStatus.INTERNAL_SERVER_ERROR,
+      message: 'Internal server error',
+    };
+  }
+
+  private handlePrismaError(error: Prisma.PrismaClientKnownRequestError) {
+    switch (error.code) {
+      case 'P2002':
+        return { status: 409, message: 'Resource already exists' };
+      case 'P2025':
+        return { status: 404, message: 'Resource not found' };
+      default:
+        return { status: 500, message: 'Database error' };
+    }
+  }
+}
+```
+
+### Business Exceptions
+
+```typescript
+// common/exceptions/business.exception.ts
+export class BusinessException extends HttpException {
+  constructor(
+    message: string,
+    public readonly code: string,
+    statusCode: number = HttpStatus.BAD_REQUEST,
+  ) {
+    super({ message, code }, statusCode);
+  }
+}
+
+export class InsufficientStockException extends BusinessException {
+  constructor(productId: string, requested: number, available: number) {
+    super(
+      `Insufficient stock for product ${productId}. Requested: ${requested}, Available: ${available}`,
+      'INSUFFICIENT_STOCK',
+    );
+  }
+}
+
+// Использование
+if (variant.stock < quantity) {
+  throw new InsufficientStockException(productId, quantity, variant.stock);
+}
+```
+
+---
+
+## 📊 ЛОГИРОВАНИЕ
+
+```typescript
+// Используй встроенный Logger
+@Injectable()
+export class OrdersService {
+  private readonly logger = new Logger(OrdersService.name);
+
+  async create(dto: CreateOrderDto): Promise<Order> {
+    this.logger.log(`Creating order for user ${dto.userId}`);
+    
+    try {
+      const order = await this.processOrder(dto);
+      this.logger.log(`Order created: ${order.id}`);
+      return order;
+    } catch (error) {
+      this.logger.error(`Failed to create order: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+}
+```
+
+---
+
+## 📋 CHECKLIST
+
+### Модуль
+
+- [ ] Контроллер тонкий (только роутинг)
+- [ ] Сервис содержит бизнес-логику
+- [ ] DTO с валидацией
+- [ ] Swagger документация
+- [ ] Guards для защиты эндпоинтов
+- [ ] Обработка ошибок
+- [ ] Логирование важных операций
+
+---
+
+**Версия:** 1.0
+**Дата:** 2025-01-31

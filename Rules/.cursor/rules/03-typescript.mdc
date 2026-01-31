@@ -1,0 +1,468 @@
+---
+description: Правила TypeScript. Применяется ко всем .ts и .tsx файлам.
+globs: ["**/*.ts", "**/*.tsx"]
+alwaysApply: false
+---
+
+# ПРАВИЛА TYPESCRIPT
+
+> Строгая типизация = надёжный код. Никаких any, никаких компромиссов.
+
+---
+
+## 🎯 ГЛАВНЫЕ ПРИНЦИПЫ
+
+1. **Strict Mode всегда включён** — `"strict": true` в tsconfig
+2. **any запрещён** — используй unknown или конкретные типы
+3. **Явные типы** — для параметров функций и возвращаемых значений
+4. **Inference где возможно** — для локальных переменных
+
+---
+
+## 📝 ТИПЫ И ИНТЕРФЕЙСЫ
+
+### Когда interface, когда type
+
+```typescript
+// ✅ interface — для объектов и классов
+interface User {
+  id: string;
+  name: string;
+  email: string;
+}
+
+interface UserService {
+  getUser(id: string): Promise<User>;
+  createUser(data: CreateUserDTO): Promise<User>;
+}
+
+// ✅ type — для unions, intersections, примитивов
+type UserRole = 'admin' | 'user' | 'guest';
+type Status = 'pending' | 'active' | 'disabled';
+type ID = string | number;
+type UserWithRole = User & { role: UserRole };
+
+// ✅ type — для функций
+type EventHandler = (event: Event) => void;
+type AsyncFunction<T> = () => Promise<T>;
+```
+
+### Правила именования типов
+
+```typescript
+// ✅ ХОРОШО — PascalCase, описательные имена
+interface UserProfile { ... }
+type OrderStatus = 'pending' | 'completed';
+type CreateUserDTO = { ... };
+type UserResponse = ApiResponse<User>;
+
+// ❌ ПЛОХО — префиксы I/T
+interface IUser { ... }  // Не используй I
+type TUserRole = ...;    // Не используй T
+```
+
+---
+
+## 🚫 ЗАПРЕЩЁННЫЕ ПАТТЕРНЫ
+
+### any — НИКОГДА
+
+```typescript
+// ❌ ЗАПРЕЩЕНО
+function process(data: any) { ... }
+const result: any = fetchData();
+const items = [] as any[];
+
+// ✅ Используй unknown
+function process(data: unknown) {
+  if (typeof data === 'string') {
+    return data.toUpperCase();
+  }
+  if (isUser(data)) {
+    return data.name;
+  }
+  throw new Error('Invalid data type');
+}
+
+// ✅ Используй generics
+function process<T>(data: T): T {
+  return data;
+}
+
+// ✅ Используй конкретные типы
+function process(data: User | Product) { ... }
+```
+
+### Type Assertions — минимизировать
+
+```typescript
+// ❌ Избегай as
+const user = data as User;
+const element = document.getElementById('app') as HTMLDivElement;
+
+// ✅ Используй type guards
+function isUser(data: unknown): data is User {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    'id' in data &&
+    'name' in data
+  );
+}
+
+if (isUser(data)) {
+  console.log(data.name); // TypeScript знает что это User
+}
+
+// ✅ Если assertion необходим — добавь комментарий
+// Type assertion безопасен: getElementById гарантированно вернёт div
+const element = document.getElementById('app') as HTMLDivElement;
+```
+
+### Non-null Assertion — избегать
+
+```typescript
+// ❌ Избегай !
+const name = user!.name;
+const first = items![0];
+
+// ✅ Проверяй явно
+if (!user) throw new Error('User required');
+const name = user.name;
+
+// ✅ Или используй optional chaining с fallback
+const name = user?.name ?? 'Unknown';
+```
+
+---
+
+## ✅ ЛУЧШИЕ ПРАКТИКИ
+
+### Utility Types
+
+```typescript
+// Partial — все поля опциональные
+type UpdateUserDTO = Partial<User>;
+
+// Required — все поля обязательные
+type CompleteUser = Required<User>;
+
+// Pick — только указанные поля
+type UserPreview = Pick<User, 'id' | 'name'>;
+
+// Omit — все кроме указанных
+type UserWithoutPassword = Omit<User, 'password'>;
+
+// Record — объект с ключами и значениями
+type UsersByRole = Record<UserRole, User[]>;
+
+// ReturnType — тип возвращаемого значения
+type FetchResult = ReturnType<typeof fetchUser>;
+
+// Parameters — типы параметров функции
+type FetchParams = Parameters<typeof fetchUser>;
+```
+
+### Discriminated Unions
+
+```typescript
+// ✅ Отличный паттерн для состояний
+type AsyncState<T> =
+  | { status: 'idle' }
+  | { status: 'loading' }
+  | { status: 'success'; data: T }
+  | { status: 'error'; error: Error };
+
+function renderState<T>(state: AsyncState<T>) {
+  switch (state.status) {
+    case 'idle':
+      return null;
+    case 'loading':
+      return <Spinner />;
+    case 'success':
+      return <Data data={state.data} />; // TypeScript знает что data есть
+    case 'error':
+      return <Error error={state.error} />; // TypeScript знает что error есть
+  }
+}
+```
+
+### Generics
+
+```typescript
+// ✅ Generic функции
+function first<T>(items: T[]): T | undefined {
+  return items[0];
+}
+
+// ✅ Generic с constraints
+function getProperty<T, K extends keyof T>(obj: T, key: K): T[K] {
+  return obj[key];
+}
+
+// ✅ Generic интерфейсы
+interface ApiResponse<T> {
+  data: T;
+  meta: {
+    total: number;
+    page: number;
+  };
+}
+
+// ✅ Default generic types
+interface PaginatedList<T = unknown> {
+  items: T[];
+  total: number;
+  page: number;
+}
+```
+
+### Const Assertions
+
+```typescript
+// ✅ as const для literal types
+const STATUS = {
+  PENDING: 'pending',
+  ACTIVE: 'active',
+  DISABLED: 'disabled',
+} as const;
+
+type Status = typeof STATUS[keyof typeof STATUS];
+// type Status = 'pending' | 'active' | 'disabled'
+
+// ✅ Для arrays
+const ROLES = ['admin', 'user', 'guest'] as const;
+type Role = typeof ROLES[number];
+// type Role = 'admin' | 'user' | 'guest'
+```
+
+---
+
+## 🔧 ФУНКЦИИ
+
+### Типизация функций
+
+```typescript
+// ✅ Явные типы параметров и возврата для публичных функций
+function createUser(data: CreateUserDTO): User {
+  return {
+    id: generateId(),
+    ...data,
+    createdAt: new Date(),
+  };
+}
+
+// ✅ Async функции
+async function fetchUser(id: string): Promise<User> {
+  const response = await api.get(`/users/${id}`);
+  return response.data;
+}
+
+// ✅ Функции с колбэками
+function forEach<T>(
+  items: T[],
+  callback: (item: T, index: number) => void
+): void {
+  items.forEach(callback);
+}
+
+// ✅ Optional параметры
+function greet(name: string, title?: string): string {
+  return title ? `Hello, ${title} ${name}` : `Hello, ${name}`;
+}
+
+// ✅ Default параметры
+function paginate<T>(items: T[], page = 1, limit = 20): T[] {
+  const start = (page - 1) * limit;
+  return items.slice(start, start + limit);
+}
+```
+
+### Overloads (перегрузка)
+
+```typescript
+// ✅ Когда функция ведёт себя по-разному в зависимости от типа
+function createElement(tag: 'div'): HTMLDivElement;
+function createElement(tag: 'span'): HTMLSpanElement;
+function createElement(tag: 'input'): HTMLInputElement;
+function createElement(tag: string): HTMLElement {
+  return document.createElement(tag);
+}
+
+// Использование — TypeScript знает точный тип
+const div = createElement('div'); // HTMLDivElement
+const input = createElement('input'); // HTMLInputElement
+```
+
+---
+
+## 📦 МОДУЛИ И ЭКСПОРТЫ
+
+### Именованные экспорты (предпочтительно)
+
+```typescript
+// ✅ ХОРОШО — именованные экспорты
+export function createUser() { ... }
+export interface User { ... }
+export type UserRole = 'admin' | 'user';
+
+// Импорт
+import { createUser, User, UserRole } from './users';
+
+// ❌ ИЗБЕГАЙ — default exports
+export default function createUser() { ... }
+
+// Импорт — можно назвать как угодно (плохо для рефакторинга)
+import createUserFunction from './users';
+```
+
+### Barrel exports (index.ts)
+
+```typescript
+// features/users/index.ts
+export { UserList } from './components/UserList';
+export { UserCard } from './components/UserCard';
+export { useUsers } from './hooks/useUsers';
+export { userService } from './services/userService';
+export type { User, UserRole, CreateUserDTO } from './types';
+
+// Импорт — чисто и понятно
+import { UserList, useUsers, User } from '@/features/users';
+```
+
+---
+
+## ⚙️ КОНФИГУРАЦИЯ TSCONFIG
+
+### Рекомендуемые настройки
+
+```json
+{
+  "compilerOptions": {
+    // Strict mode — ОБЯЗАТЕЛЬНО
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noImplicitThis": true,
+    "alwaysStrict": true,
+    
+    // Дополнительные проверки
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    
+    // Модули
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    
+    // Paths
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  }
+}
+```
+
+---
+
+## 🛡️ TYPE GUARDS
+
+### Встроенные проверки
+
+```typescript
+// typeof
+if (typeof value === 'string') { ... }
+if (typeof value === 'number') { ... }
+
+// instanceof
+if (error instanceof ValidationError) { ... }
+if (element instanceof HTMLInputElement) { ... }
+
+// in
+if ('name' in user) { ... }
+
+// Array.isArray
+if (Array.isArray(items)) { ... }
+```
+
+### Custom Type Guards
+
+```typescript
+// ✅ Type predicate функции
+function isUser(value: unknown): value is User {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'id' in value &&
+    'name' in value &&
+    typeof (value as User).id === 'string' &&
+    typeof (value as User).name === 'string'
+  );
+}
+
+function isApiError(error: unknown): error is ApiError {
+  return (
+    error instanceof Error &&
+    'statusCode' in error &&
+    typeof (error as ApiError).statusCode === 'number'
+  );
+}
+
+// Использование
+function handleData(data: unknown) {
+  if (isUser(data)) {
+    console.log(data.name); // TypeScript знает тип
+  }
+}
+```
+
+### Assertion Functions
+
+```typescript
+// ✅ Для валидации в runtime
+function assertUser(value: unknown): asserts value is User {
+  if (!isUser(value)) {
+    throw new Error('Value is not a User');
+  }
+}
+
+function assertDefined<T>(value: T | undefined | null): asserts value is T {
+  if (value === undefined || value === null) {
+    throw new Error('Value must be defined');
+  }
+}
+
+// Использование
+function processUser(data: unknown) {
+  assertUser(data);
+  // После assert TypeScript знает что data это User
+  console.log(data.name);
+}
+```
+
+---
+
+## 📋 CHECKLIST
+
+### Перед коммитом
+
+- [ ] `tsc --noEmit` проходит без ошибок
+- [ ] Нет `any` в коде
+- [ ] Все публичные функции имеют явные типы
+- [ ] Используются utility types где уместно
+- [ ] Type guards для проверок типов
+- [ ] Нет `!` (non-null assertion) без необходимости
+- [ ] Нет `as` без комментария-обоснования
+
+---
+
+**Версия:** 1.0
+**Дата:** 2025-01-31
