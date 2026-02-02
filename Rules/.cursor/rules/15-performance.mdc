@@ -1,0 +1,532 @@
+---
+description: Правила производительности. Web Vitals, оптимизация, кэширование.
+globs: ["**/*.ts", "**/*.tsx", "**/app/**", "**/components/**"]
+alwaysApply: false
+---
+
+# ПРАВИЛА ПРОИЗВОДИТЕЛЬНОСТИ
+
+> Производительность — это фича. Медленное приложение = плохой UX.
+
+---
+
+## 🎯 ЦЕЛЕВЫЕ МЕТРИКИ
+
+### Web Vitals (Core)
+
+| Метрика | Цель | Описание |
+|---------|------|----------|
+| **LCP** (Largest Contentful Paint) | < 2.5s | Время до отрисовки главного контента |
+| **INP** (Interaction to Next Paint) | < 200ms | Отзывчивость на взаимодействие |
+| **CLS** (Cumulative Layout Shift) | < 0.1 | Визуальная стабильность |
+
+### Дополнительные метрики
+
+| Метрика | Цель | Описание |
+|---------|------|----------|
+| **TTFB** (Time to First Byte) | < 800ms | Время до первого байта |
+| **FCP** (First Contentful Paint) | < 1.8s | Первый контент |
+| **TTI** (Time to Interactive) | < 3.8s | Время до интерактивности |
+
+### API метрики
+
+| Метрика | Цель | Описание |
+|---------|------|----------|
+| P50 latency | < 100ms | Медиана |
+| P95 latency | < 300ms | 95-й перцентиль |
+| P99 latency | < 500ms | 99-й перцентиль |
+
+---
+
+## 🖼️ ОПТИМИЗАЦИЯ ИЗОБРАЖЕНИЙ
+
+### Next.js Image
+
+```tsx
+// ✅ ПРАВИЛЬНО — используй next/image
+import Image from 'next/image';
+
+export function ProductImage({ product }: Props) {
+  return (
+    <Image
+      src={product.imageUrl}
+      alt={product.name}
+      width={400}
+      height={400}
+      // Приоритет для LCP изображений
+      priority={product.isFeatured}
+      // Lazy loading по умолчанию
+      loading="lazy"
+      // Placeholder во время загрузки
+      placeholder="blur"
+      blurDataURL={product.blurDataUrl}
+      // Размеры для responsive
+      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+      // Качество
+      quality={80}
+    />
+  );
+}
+
+// ❌ НЕПРАВИЛЬНО — обычный img
+<img src={product.imageUrl} alt={product.name} />
+```
+
+### Форматы изображений
+
+```typescript
+// next.config.js
+module.exports = {
+  images: {
+    formats: ['image/avif', 'image/webp'],
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256],
+    minimumCacheTTL: 60 * 60 * 24 * 30, // 30 дней
+  },
+};
+```
+
+### Правила изображений
+
+```markdown
+## Checklist изображений
+
+- [ ] Используется next/image
+- [ ] priority для above-the-fold (LCP)
+- [ ] loading="lazy" для below-the-fold
+- [ ] sizes указаны для responsive
+- [ ] placeholder="blur" для больших изображений
+- [ ] Формат: WebP или AVIF
+- [ ] Размер: < 200KB для hero, < 50KB для thumbnails
+```
+
+---
+
+## 📦 ОПТИМИЗАЦИЯ БАНДЛА
+
+### Code Splitting
+
+```tsx
+// ✅ Dynamic imports для тяжёлых компонентов
+import dynamic from 'next/dynamic';
+
+// Загружаем только при необходимости
+const Chart = dynamic(() => import('@/components/Chart'), {
+  loading: () => <ChartSkeleton />,
+  ssr: false, // Только на клиенте
+});
+
+const Modal = dynamic(() => import('@/components/Modal'), {
+  loading: () => null,
+});
+
+const RichTextEditor = dynamic(
+  () => import('@/components/RichTextEditor'),
+  { ssr: false }
+);
+```
+
+### Barrel Exports с осторожностью
+
+```typescript
+// ❌ ПЛОХО — импортирует всё
+import { Button, Modal, Table } from '@/components';
+
+// ✅ ХОРОШО — только нужное
+import { Button } from '@/components/ui/Button';
+
+// Или настрой barrel правильно
+// components/ui/index.ts
+export { Button } from './Button';
+export { Input } from './Input';
+// Не экспортируй тяжёлые компоненты здесь
+```
+
+### Анализ бандла
+
+```bash
+# Установка
+npm install @next/bundle-analyzer
+
+# next.config.js
+const withBundleAnalyzer = require('@next/bundle-analyzer')({
+  enabled: process.env.ANALYZE === 'true',
+});
+
+module.exports = withBundleAnalyzer({
+  // config
+});
+
+# Запуск
+ANALYZE=true npm run build
+```
+
+### Tree Shaking
+
+```typescript
+// ✅ ПРАВИЛЬНО — импортируй только нужное
+import { format, parseISO } from 'date-fns';
+import { debounce } from 'lodash-es';
+
+// ❌ ПЛОХО — импортирует всё
+import _ from 'lodash';
+import * as dateFns from 'date-fns';
+```
+
+---
+
+## ⚡ ОПТИМИЗАЦИЯ REACT
+
+### Мемоизация
+
+```tsx
+// React.memo для компонентов в списках
+export const ProductCard = memo(function ProductCard({ product }: Props) {
+  return <div>{product.name}</div>;
+});
+
+// useMemo для дорогих вычислений
+const sortedProducts = useMemo(() => {
+  return [...products].sort((a, b) => a.price - b.price);
+}, [products]);
+
+// useCallback для стабильных функций
+const handleClick = useCallback((id: string) => {
+  onSelect(id);
+}, [onSelect]);
+```
+
+### Когда НЕ мемоизировать
+
+```tsx
+// ❌ Не нужно — простые вычисления
+const fullName = useMemo(() => `${first} ${last}`, [first, last]);
+// ✅ Просто вычисли
+const fullName = `${first} ${last}`;
+
+// ❌ Не нужно — примитивные props
+<Button label="Click" /> // label — строка, стабильная
+
+// ❌ Не нужно — компонент и так редко рендерится
+const Header = memo(() => ...); // Если Header один раз рендерится
+```
+
+### Virtualization для длинных списков
+
+```tsx
+import { useVirtualizer } from '@tanstack/react-virtual';
+
+export function ProductList({ products }: Props) {
+  const parentRef = useRef<HTMLDivElement>(null);
+
+  const virtualizer = useVirtualizer({
+    count: products.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 100, // Примерная высота элемента
+    overscan: 5, // Сколько элементов рендерить за пределами viewport
+  });
+
+  return (
+    <div ref={parentRef} className="h-[600px] overflow-auto">
+      <div
+        style={{
+          height: `${virtualizer.getTotalSize()}px`,
+          position: 'relative',
+        }}
+      >
+        {virtualizer.getVirtualItems().map((virtualItem) => (
+          <div
+            key={virtualItem.key}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: `${virtualItem.size}px`,
+              transform: `translateY(${virtualItem.start}px)`,
+            }}
+          >
+            <ProductCard product={products[virtualItem.index]} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## 🗄️ КЭШИРОВАНИЕ
+
+### Next.js Caching
+
+```tsx
+// Server Components — кэширование fetch
+async function getProducts() {
+  const res = await fetch('https://api.example.com/products', {
+    // Кэшировать на 1 час
+    next: { revalidate: 3600 },
+  });
+  return res.json();
+}
+
+// Отключить кэш
+await fetch(url, { cache: 'no-store' });
+
+// Использовать кэш (по умолчанию)
+await fetch(url, { cache: 'force-cache' });
+```
+
+### React Query Caching
+
+```typescript
+// lib/query-client.ts
+export const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Данные считаются свежими 1 минуту
+      staleTime: 1000 * 60,
+      // Кэш хранится 5 минут
+      gcTime: 1000 * 60 * 5,
+      // Не рефетчить при фокусе (для статичных данных)
+      refetchOnWindowFocus: false,
+    },
+  },
+});
+
+// Кастомные настройки для запроса
+const { data } = useQuery({
+  queryKey: ['products', filters],
+  queryFn: () => fetchProducts(filters),
+  staleTime: 1000 * 60 * 5, // 5 минут для этого запроса
+});
+```
+
+### HTTP Caching
+
+```typescript
+// API endpoint с Cache-Control
+export async function GET(request: Request) {
+  const data = await getProducts();
+  
+  return new Response(JSON.stringify(data), {
+    headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'public, max-age=300, s-maxage=600',
+      // max-age — для браузера (5 мин)
+      // s-maxage — для CDN (10 мин)
+    },
+  });
+}
+```
+
+### Redis Caching (Backend)
+
+```typescript
+// services/cache.service.ts
+@Injectable()
+export class CacheService {
+  constructor(private readonly redis: Redis) {}
+
+  async get<T>(key: string): Promise<T | null> {
+    const data = await this.redis.get(key);
+    return data ? JSON.parse(data) : null;
+  }
+
+  async set(key: string, value: unknown, ttlSeconds: number): Promise<void> {
+    await this.redis.setex(key, ttlSeconds, JSON.stringify(value));
+  }
+
+  async del(key: string): Promise<void> {
+    await this.redis.del(key);
+  }
+
+  async invalidatePattern(pattern: string): Promise<void> {
+    const keys = await this.redis.keys(pattern);
+    if (keys.length > 0) {
+      await this.redis.del(...keys);
+    }
+  }
+}
+
+// Использование
+async findOne(id: string): Promise<Product> {
+  const cacheKey = `product:${id}`;
+  
+  // Проверяем кэш
+  const cached = await this.cache.get<Product>(cacheKey);
+  if (cached) return cached;
+  
+  // Загружаем из БД
+  const product = await this.prisma.product.findUnique({ where: { id } });
+  
+  // Кэшируем на 1 час
+  await this.cache.set(cacheKey, product, 3600);
+  
+  return product;
+}
+```
+
+### Стратегии инвалидации
+
+```typescript
+// Инвалидация при обновлении
+async update(id: string, data: UpdateProductDto) {
+  const product = await this.prisma.product.update({
+    where: { id },
+    data,
+  });
+  
+  // Инвалидируем конкретный ключ
+  await this.cache.del(`product:${id}`);
+  
+  // Инвалидируем списки
+  await this.cache.invalidatePattern('products:list:*');
+  
+  return product;
+}
+```
+
+---
+
+## 🔧 ОПТИМИЗАЦИЯ BACKEND
+
+### Database Queries
+
+```typescript
+// ✅ Select только нужные поля
+const users = await prisma.user.findMany({
+  select: {
+    id: true,
+    name: true,
+    email: true,
+  },
+});
+
+// ✅ Используй include вместо N+1
+const orders = await prisma.order.findMany({
+  include: {
+    items: true,
+    user: { select: { id: true, name: true } },
+  },
+});
+
+// ✅ Пагинация
+const products = await prisma.product.findMany({
+  skip: (page - 1) * limit,
+  take: limit,
+  orderBy: { createdAt: 'desc' },
+});
+
+// ✅ Индексы для частых запросов
+// В schema.prisma
+// @@index([status, createdAt])
+```
+
+### Параллельные запросы
+
+```typescript
+// ✅ Параллельно когда независимые
+const [user, orders, notifications] = await Promise.all([
+  prisma.user.findUnique({ where: { id: userId } }),
+  prisma.order.findMany({ where: { userId } }),
+  prisma.notification.findMany({ where: { userId, read: false } }),
+]);
+
+// ❌ Последовательно (медленнее)
+const user = await prisma.user.findUnique({ where: { id: userId } });
+const orders = await prisma.order.findMany({ where: { userId } });
+const notifications = await prisma.notification.findMany({ where: { userId } });
+```
+
+### Connection Pooling
+
+```typescript
+// prisma/schema.prisma
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  // Пул соединений
+  // ?connection_limit=10&pool_timeout=30
+}
+```
+
+---
+
+## 📊 МОНИТОРИНГ ПРОИЗВОДИТЕЛЬНОСТИ
+
+### Web Vitals Tracking
+
+```tsx
+// app/layout.tsx
+import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/next';
+
+export default function RootLayout({ children }: Props) {
+  return (
+    <html>
+      <body>
+        {children}
+        <Analytics />
+        <SpeedInsights />
+      </body>
+    </html>
+  );
+}
+```
+
+### Custom Metrics
+
+```typescript
+// lib/performance.ts
+export function reportWebVitals(metric: any) {
+  const { name, value, id } = metric;
+  
+  // Отправка в аналитику
+  analytics.track('web_vital', {
+    metric: name,
+    value: Math.round(name === 'CLS' ? value * 1000 : value),
+    id,
+  });
+  
+  // Или в свой backend
+  fetch('/api/metrics', {
+    method: 'POST',
+    body: JSON.stringify({ name, value, id }),
+  });
+}
+```
+
+---
+
+## 📋 CHECKLIST
+
+### Frontend
+
+- [ ] Изображения через next/image
+- [ ] Lazy loading для below-the-fold
+- [ ] Dynamic imports для тяжёлых компонентов
+- [ ] Virtualization для длинных списков
+- [ ] Мемоизация где нужно
+- [ ] Bundle size < 200KB для initial JS
+
+### Backend
+
+- [ ] Индексы на частых запросах
+- [ ] Нет N+1 проблем
+- [ ] Пагинация для списков
+- [ ] Кэширование горячих данных
+- [ ] Параллельные запросы где возможно
+
+### Метрики
+
+- [ ] LCP < 2.5s
+- [ ] INP < 200ms
+- [ ] CLS < 0.1
+- [ ] API P95 < 300ms
+
+---
+
+**Версия:** 1.0
+**Дата:** 2025-01-31

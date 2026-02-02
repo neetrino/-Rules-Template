@@ -245,19 +245,39 @@ docs/
 
 В зависимости от контекста, применяй дополнительные правила:
 
+### Архитектура и код
 - `01-architecture.mdc` — структура проекта
 - `02-coding-standards.mdc` — стандарты кода
 - `03-typescript.mdc` — TypeScript специфика
+
+### Frontend
 - `04-react-nextjs.mdc` — React и Next.js
+- `09-figma-design.mdc` — дизайн и Figma
+- `16-state-management.mdc` — управление состоянием
+
+### Backend
 - `05-backend-nestjs.mdc` — NestJS и backend
 - `06-database.mdc` — работа с БД
 - `07-api-design.mdc` — дизайн API
+
+### Качество и процессы
 - `08-security.mdc` — безопасность
-- `09-figma-design.mdc` — дизайн и Figma
 - `10-testing.mdc` — тестирование
 - `11-documentation.mdc` — документация
+- `12-error-handling.mdc` — обработка ошибок
+- `19-checklists.mdc` — чеклисты (DoD, PR, Release)
+
+### DevOps и надёжность
+- `13-git-workflow.mdc` — Git процессы
+- `14-observability.mdc` — логи и мониторинг
+- `15-performance.mdc` — производительность
+- `17-cicd.mdc` — CI/CD пайплайны
+- `18-reliability.mdc` — надёжность
+
+### Размер проекта
+- `99-project-size.mdc` — определение размера проекта
 
 ---
 
-**Версия:** 1.0
+**Версия:** 2.0
 **Дата:** 2025-01-31

@@ -1,0 +1,556 @@
+---
+description: Правила надёжности. Timeouts, retries, graceful shutdown, fault tolerance.
+globs: ["**/*.ts", "**/api/**", "**/server/**"]
+alwaysApply: false
+---
+
+# ПРАВИЛА НАДЁЖНОСТИ
+
+> Всё ломается. Вопрос в том, как система на это реагирует.
+
+---
+
+## 🎯 ГЛАВНЫЕ ПРИНЦИПЫ
+
+1. **Fail Fast** — не жди вечно, ставь таймауты
+2. **Graceful Degradation** — работай даже при частичных отказах
+3. **Retry with Backoff** — повторяй умно, не DDoS-ь
+4. **Circuit Breaker** — защищай от каскадных сбоев
+
+---
+
+## ⏱️ TIMEOUTS
+
+### Правила таймаутов
+
+```typescript
+// ✅ ВСЕГДА ставь таймауты на внешние вызовы
+
+// HTTP запросы
+const controller = new AbortController();
+const timeout = setTimeout(() => controller.abort(), 5000);
+
+try {
+  const response = await fetch(url, {
+    signal: controller.signal,
+  });
+} finally {
+  clearTimeout(timeout);
+}
+
+// Или с библиотекой
+import ky from 'ky';
+
+const api = ky.create({
+  timeout: 10000, // 10 секунд
+  retry: {
+    limit: 2,
+    methods: ['get'],
+    statusCodes: [408, 502, 503, 504],
+  },
+});
+```
+
+### Рекомендуемые таймауты
+
+| Операция | Timeout | Примечание |
+|----------|---------|------------|
+| API call (внутренний) | 5-10s | Между своими сервисами |
+| API call (внешний) | 10-30s | Сторонние сервисы |
+| Database query | 5-30s | Зависит от сложности |
+| File upload | 60-300s | Зависит от размера |
+| Payment processing | 30-60s | Критично, с retry |
+
+### Таймауты в Prisma
+
+```typescript
+// prisma/schema.prisma
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// В connection string
+// ?connection_limit=10&connect_timeout=10&pool_timeout=10
+
+// Или в коде
+const prisma = new PrismaClient({
+  datasources: {
+    db: {
+      url: process.env.DATABASE_URL,
+    },
+  },
+});
+
+// Transaction timeout
+await prisma.$transaction(
+  async (tx) => {
+    // operations
+  },
+  {
+    maxWait: 5000,  // Ждать транзакцию
+    timeout: 10000, // Timeout самой транзакции
+  }
+);
+```
+
+---
+
+## 🔄 RETRY STRATEGIES
+
+### Exponential Backoff
+
+```typescript
+// lib/utils/retry.ts
+
+interface RetryConfig {
+  maxRetries: number;
+  baseDelay: number;    // ms
+  maxDelay: number;     // ms
+  backoffFactor: number;
+  jitter: boolean;
+  retryCondition?: (error: Error) => boolean;
+}
+
+const DEFAULT_CONFIG: RetryConfig = {
+  maxRetries: 3,
+  baseDelay: 1000,
+  maxDelay: 30000,
+  backoffFactor: 2,
+  jitter: true,
+};
+
+export async function withRetry<T>(
+  fn: () => Promise<T>,
+  config: Partial<RetryConfig> = {}
+): Promise<T> {
+  const {
+    maxRetries,
+    baseDelay,
+    maxDelay,
+    backoffFactor,
+    jitter,
+    retryCondition,
+  } = { ...DEFAULT_CONFIG, ...config };
+
+  let lastError: Error;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error as Error;
+
+      // Проверяем нужно ли ретраить
+      if (retryCondition && !retryCondition(lastError)) {
+        throw lastError;
+      }
+
+      // Последняя попытка — выбрасываем ошибку
+      if (attempt === maxRetries) {
+        throw lastError;
+      }
+
+      // Вычисляем delay
+      let delay = Math.min(
+        baseDelay * Math.pow(backoffFactor, attempt),
+        maxDelay
+      );
+
+      // Добавляем jitter (±10%)
+      if (jitter) {
+        const jitterAmount = delay * 0.1;
+        delay += Math.random() * jitterAmount * 2 - jitterAmount;
+      }
+
+      console.log(
+        `Retry attempt ${attempt + 1}/${maxRetries} after ${delay}ms`
+      );
+
+      await sleep(delay);
+    }
+  }
+
+  throw lastError!;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+```
+
+### Использование
+
+```typescript
+// Простой ретрай
+const data = await withRetry(() => fetchData(url));
+
+// С кастомной конфигурацией
+const data = await withRetry(
+  () => processPayment(orderId),
+  {
+    maxRetries: 5,
+    baseDelay: 2000,
+    retryCondition: (error) => {
+      // Ретраим только на определённые ошибки
+      if (error instanceof ApiError) {
+        return error.statusCode >= 500 || error.statusCode === 429;
+      }
+      return true;
+    },
+  }
+);
+```
+
+### Когда НЕ ретраить
+
+```typescript
+// ❌ НЕ ретраить:
+// - 4xx ошибки (кроме 429, 408)
+// - Validation errors
+// - Auth errors (401, 403)
+// - Business logic errors
+
+const retryableStatuses = new Set([408, 429, 500, 502, 503, 504]);
+
+const shouldRetry = (error: ApiError): boolean => {
+  return retryableStatuses.has(error.statusCode);
+};
+```
+
+---
+
+## 🔌 CIRCUIT BREAKER
+
+### Паттерн Circuit Breaker
+
+```typescript
+// lib/utils/circuit-breaker.ts
+
+enum CircuitState {
+  CLOSED = 'CLOSED',   // Нормальная работа
+  OPEN = 'OPEN',       // Блокируем вызовы
+  HALF_OPEN = 'HALF_OPEN', // Пробуем восстановиться
+}
+
+interface CircuitBreakerConfig {
+  failureThreshold: number;  // Сколько ошибок до открытия
+  successThreshold: number;  // Сколько успехов для закрытия
+  timeout: number;           // Время в OPEN состоянии (ms)
+}
+
+export class CircuitBreaker {
+  private state: CircuitState = CircuitState.CLOSED;
+  private failures: number = 0;
+  private successes: number = 0;
+  private lastFailureTime?: number;
+
+  constructor(
+    private readonly name: string,
+    private readonly config: CircuitBreakerConfig = {
+      failureThreshold: 5,
+      successThreshold: 2,
+      timeout: 30000,
+    }
+  ) {}
+
+  async execute<T>(fn: () => Promise<T>): Promise<T> {
+    // Проверяем состояние
+    if (this.state === CircuitState.OPEN) {
+      if (this.shouldAttemptReset()) {
+        this.state = CircuitState.HALF_OPEN;
+      } else {
+        throw new CircuitOpenError(this.name);
+      }
+    }
+
+    try {
+      const result = await fn();
+      this.onSuccess();
+      return result;
+    } catch (error) {
+      this.onFailure();
+      throw error;
+    }
+  }
+
+  private onSuccess(): void {
+    this.failures = 0;
+
+    if (this.state === CircuitState.HALF_OPEN) {
+      this.successes++;
+      if (this.successes >= this.config.successThreshold) {
+        this.state = CircuitState.CLOSED;
+        this.successes = 0;
+        console.log(`Circuit ${this.name} CLOSED`);
+      }
+    }
+  }
+
+  private onFailure(): void {
+    this.failures++;
+    this.lastFailureTime = Date.now();
+
+    if (this.state === CircuitState.HALF_OPEN) {
+      this.state = CircuitState.OPEN;
+      this.successes = 0;
+      console.log(`Circuit ${this.name} OPEN (from HALF_OPEN)`);
+    } else if (this.failures >= this.config.failureThreshold) {
+      this.state = CircuitState.OPEN;
+      console.log(`Circuit ${this.name} OPEN`);
+    }
+  }
+
+  private shouldAttemptReset(): boolean {
+    return (
+      this.lastFailureTime !== undefined &&
+      Date.now() - this.lastFailureTime >= this.config.timeout
+    );
+  }
+
+  getState(): CircuitState {
+    return this.state;
+  }
+}
+
+class CircuitOpenError extends Error {
+  constructor(circuitName: string) {
+    super(`Circuit breaker "${circuitName}" is OPEN`);
+    this.name = 'CircuitOpenError';
+  }
+}
+```
+
+### Использование
+
+```typescript
+// Создаём circuit breaker для каждого внешнего сервиса
+const paymentCircuit = new CircuitBreaker('payment-service', {
+  failureThreshold: 3,
+  successThreshold: 2,
+  timeout: 60000,
+});
+
+async function processPayment(orderId: string) {
+  return paymentCircuit.execute(async () => {
+    return await paymentApi.charge(orderId);
+  });
+}
+
+// При открытом circuit — graceful degradation
+try {
+  await processPayment(orderId);
+} catch (error) {
+  if (error instanceof CircuitOpenError) {
+    // Альтернативный путь
+    await queuePaymentForLater(orderId);
+    return { status: 'queued' };
+  }
+  throw error;
+}
+```
+
+---
+
+## 🛑 GRACEFUL SHUTDOWN
+
+### Node.js Graceful Shutdown
+
+```typescript
+// main.ts
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app.module';
+import { Logger } from '@nestjs/common';
+
+async function bootstrap() {
+  const logger = new Logger('Bootstrap');
+  const app = await NestFactory.create(AppModule);
+
+  // Включаем shutdown hooks
+  app.enableShutdownHooks();
+
+  // Graceful shutdown обработчик
+  const shutdown = async (signal: string) => {
+    logger.log(`Received ${signal}. Starting graceful shutdown...`);
+
+    // Устанавливаем таймаут на shutdown
+    const shutdownTimeout = setTimeout(() => {
+      logger.error('Shutdown timeout exceeded, forcing exit');
+      process.exit(1);
+    }, 30000);
+
+    try {
+      // Закрываем приложение (NestJS сам обработает)
+      await app.close();
+      logger.log('Application closed successfully');
+      clearTimeout(shutdownTimeout);
+      process.exit(0);
+    } catch (error) {
+      logger.error('Error during shutdown', error);
+      clearTimeout(shutdownTimeout);
+      process.exit(1);
+    }
+  };
+
+  // Слушаем сигналы
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
+
+  await app.listen(3000);
+  logger.log('Application started on port 3000');
+}
+
+bootstrap();
+```
+
+### OnModuleDestroy для cleanup
+
+```typescript
+// services/database.service.ts
+import { Injectable, OnModuleDestroy, Logger } from '@nestjs/common';
+import { PrismaClient } from '@prisma/client';
+
+@Injectable()
+export class PrismaService extends PrismaClient implements OnModuleDestroy {
+  private readonly logger = new Logger(PrismaService.name);
+
+  async onModuleDestroy() {
+    this.logger.log('Disconnecting from database...');
+    await this.$disconnect();
+    this.logger.log('Database disconnected');
+  }
+}
+
+// services/redis.service.ts
+@Injectable()
+export class RedisService implements OnModuleDestroy {
+  private readonly logger = new Logger(RedisService.name);
+
+  async onModuleDestroy() {
+    this.logger.log('Closing Redis connection...');
+    await this.redis.quit();
+    this.logger.log('Redis disconnected');
+  }
+}
+```
+
+### Kubernetes Readiness/Liveness
+
+```typescript
+// health/health.controller.ts
+@Controller('health')
+export class HealthController {
+  constructor(private readonly health: HealthCheckService) {}
+
+  // Liveness — приложение живо?
+  @Get('live')
+  @HealthCheck()
+  liveness() {
+    return { status: 'ok' };
+  }
+
+  // Readiness — готово принимать трафик?
+  @Get('ready')
+  @HealthCheck()
+  readiness() {
+    return this.health.check([
+      // Проверяем БД
+      () => this.db.pingCheck('database'),
+      // Проверяем Redis
+      () => this.redis.pingCheck('redis'),
+    ]);
+  }
+}
+```
+
+---
+
+## 🔥 FAULT TOLERANCE PATTERNS
+
+### Fallback
+
+```typescript
+// При ошибке — используем fallback
+async function getProductRecommendations(userId: string): Promise<Product[]> {
+  try {
+    return await recommendationService.getPersonalized(userId);
+  } catch (error) {
+    logger.warn('Recommendation service failed, using fallback', { userId });
+    // Fallback на популярные товары
+    return await productService.getPopular();
+  }
+}
+```
+
+### Bulkhead (изоляция)
+
+```typescript
+// Изолируем критичные операции
+import PQueue from 'p-queue';
+
+// Отдельные очереди для разных типов операций
+const paymentQueue = new PQueue({ concurrency: 10 });
+const emailQueue = new PQueue({ concurrency: 5 });
+const analyticsQueue = new PQueue({ concurrency: 20 });
+
+// Критичные операции не блокируются не-критичными
+await paymentQueue.add(() => processPayment(order));
+emailQueue.add(() => sendConfirmationEmail(order));  // Не ждём
+analyticsQueue.add(() => trackPurchase(order));      // Не ждём
+```
+
+### Rate Limiting (Client Side)
+
+```typescript
+import Bottleneck from 'bottleneck';
+
+// Лимитируем запросы к внешнему API
+const limiter = new Bottleneck({
+  maxConcurrent: 5,      // Максимум 5 одновременных
+  minTime: 100,          // Минимум 100ms между запросами
+  reservoir: 100,        // 100 запросов
+  reservoirRefreshAmount: 100,
+  reservoirRefreshInterval: 60 * 1000, // Обновляем каждую минуту
+});
+
+const response = await limiter.schedule(() => 
+  externalApi.call(data)
+);
+```
+
+---
+
+## 📋 CHECKLIST
+
+### Timeouts
+
+- [ ] Все внешние вызовы имеют таймауты
+- [ ] Database queries с таймаутами
+- [ ] HTTP requests с таймаутами
+- [ ] Таймауты адекватны операциям
+
+### Retries
+
+- [ ] Exponential backoff для ретраев
+- [ ] Jitter для предотвращения thundering herd
+- [ ] Ретрай только для recoverable ошибок
+- [ ] Лимит на количество ретраев
+
+### Graceful Shutdown
+
+- [ ] Обработка SIGTERM/SIGINT
+- [ ] Закрытие database connections
+- [ ] Завершение активных requests
+- [ ] Timeout на shutdown
+
+### Fault Tolerance
+
+- [ ] Circuit breakers для внешних сервисов
+- [ ] Fallbacks для non-critical features
+- [ ] Health checks (liveness/readiness)
+- [ ] Rate limiting для защиты
+
+---
+
+**Версия:** 1.0
+**Дата:** 2025-01-31

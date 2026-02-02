@@ -1,0 +1,518 @@
+---
+description: Правила работы с Git. Ветки, коммиты, PR, merge стратегии.
+globs: ["**/*"]
+alwaysApply: false
+---
+
+# ПРАВИЛА GIT WORKFLOW
+
+> Чистая история = понятная история. Консистентные коммиты = простое ревью.
+
+---
+
+## 🎯 ГЛАВНЫЕ ПРИНЦИПЫ
+
+1. **Conventional Commits** — стандартизированные сообщения
+2. **Feature Branches** — каждая задача в своей ветке
+3. **Small PRs** — маленькие, фокусированные изменения
+4. **Linear History** — чистая линейная история (где возможно)
+
+---
+
+## 🌿 СТРАТЕГИЯ ВЕТОК
+
+### Основные ветки
+
+```
+main (production)
+├── develop (staging) — для средних/крупных проектов
+│   ├── feature/add-payment
+│   ├── feature/user-profile
+│   └── bugfix/cart-total
+└── hotfix/critical-fix — срочные фиксы в production
+```
+
+### Для малых проектов (A)
+
+```
+main (production + development)
+├── feature/xxx
+├── bugfix/xxx
+└── hotfix/xxx
+```
+
+### Для средних/крупных проектов (B, C)
+
+```
+main (production)
+├── develop (staging/preview)
+│   ├── feature/xxx
+│   ├── bugfix/xxx
+│   └── refactor/xxx
+└── hotfix/xxx (ветвится от main)
+```
+
+---
+
+## 📛 ИМЕНОВАНИЕ ВЕТОК
+
+### Формат
+
+```
+<type>/<ticket-id?>-<short-description>
+```
+
+### Типы веток
+
+| Тип | Когда использовать | Пример |
+|-----|-------------------|--------|
+| `feature/` | Новая функциональность | `feature/add-cart` |
+| `bugfix/` | Исправление бага | `bugfix/fix-login-error` |
+| `hotfix/` | Срочный фикс в production | `hotfix/critical-payment-fix` |
+| `refactor/` | Рефакторинг без новой функциональности | `refactor/auth-module` |
+| `docs/` | Только документация | `docs/api-endpoints` |
+| `test/` | Только тесты | `test/add-order-tests` |
+| `chore/` | Инфраструктура, зависимости | `chore/update-deps` |
+
+### Правила именования
+
+```bash
+# ✅ ПРАВИЛЬНО
+feature/user-authentication
+feature/JIRA-123-add-payment
+bugfix/cart-total-calculation
+refactor/extract-api-client
+chore/upgrade-nextjs-15
+
+# ❌ НЕПРАВИЛЬНО
+feature_add_payment        # Подчёркивания
+Feature/AddPayment         # CamelCase
+my-feature                 # Без типа
+feature/add_payment_method # Смешанный стиль
+```
+
+---
+
+## 💬 CONVENTIONAL COMMITS
+
+### Формат сообщения
+
+```
+<type>(<scope?>): <subject>
+
+<body?>
+
+<footer?>
+```
+
+### Типы коммитов
+
+| Тип | Когда использовать | CHANGELOG |
+|-----|-------------------|-----------|
+| `feat` | Новая функциональность | Minor ↑ |
+| `fix` | Исправление бага | Patch ↑ |
+| `docs` | Только документация | - |
+| `style` | Форматирование (не CSS!) | - |
+| `refactor` | Рефакторинг | - |
+| `perf` | Улучшение производительности | Patch ↑ |
+| `test` | Добавление тестов | - |
+| `build` | Сборка, зависимости | - |
+| `ci` | CI/CD конфигурация | - |
+| `chore` | Прочие изменения | - |
+| `revert` | Откат изменений | - |
+
+### Breaking Changes
+
+```bash
+# С breaking change
+feat(api)!: change response format
+
+BREAKING CHANGE: Response now wrapped in { data: ... }
+
+# Или в footer
+feat(auth): add OAuth support
+
+BREAKING CHANGE: removed password login
+```
+
+### Примеры коммитов
+
+```bash
+# ✅ ХОРОШО — информативно
+feat(cart): add quantity selector to cart items
+fix(auth): handle expired token refresh
+docs(readme): add deployment instructions
+refactor(api): extract validation to separate service
+perf(images): implement lazy loading for product gallery
+test(orders): add integration tests for checkout flow
+
+# ❌ ПЛОХО — неинформативно
+fix: bug
+update code
+WIP
+changes
+asdf
+```
+
+### Scope (область)
+
+```bash
+# По фиче/модулю
+feat(cart): ...
+feat(auth): ...
+feat(products): ...
+
+# По слою
+fix(api): ...
+fix(ui): ...
+fix(db): ...
+
+# Без scope если глобально
+chore: update dependencies
+docs: add contributing guide
+```
+
+### Шаблон коммита
+
+```bash
+# ~/.gitmessage
+
+# <type>(<scope>): <subject>
+# |<----  Using a Maximum Of 50 Characters  ---->|
+
+# Body (optional)
+# |<----   Try To Limit Each Line to a Max Of 72 Characters   ---->|
+
+# Footer (optional)
+# BREAKING CHANGE: <description>
+# Closes #123
+```
+
+```bash
+# Использование шаблона
+git config commit.template ~/.gitmessage
+```
+
+---
+
+## 🔀 PULL REQUESTS
+
+### Правила PR
+
+1. **Один PR = одна задача** — не смешивай несвязанные изменения
+2. **Маленький размер** — до 400 строк (идеально до 200)
+3. **Self-review** — проверь свой PR перед запросом ревью
+4. **Тесты проходят** — CI должен быть зелёным
+5. **Описание заполнено** — что, зачем, как тестировать
+
+### Шаблон PR
+
+```markdown
+## Описание
+
+Краткое описание изменений.
+
+## Тип изменения
+
+- [ ] 🚀 Новая функциональность (feature)
+- [ ] 🐛 Исправление бага (bugfix)
+- [ ] 🔧 Рефакторинг (refactor)
+- [ ] 📚 Документация (docs)
+- [ ] ⚡ Производительность (perf)
+
+## Связанные задачи
+
+- Closes #123
+- Related to #456
+
+## Изменения
+
+- Добавлен компонент X
+- Исправлена валидация Y
+- Рефакторинг модуля Z
+
+## Скриншоты (если UI)
+
+| Before | After |
+|--------|-------|
+| ... | ... |
+
+## Как тестировать
+
+1. Шаг 1
+2. Шаг 2
+3. Ожидаемый результат
+
+## Checklist
+
+- [ ] Код соответствует стандартам проекта
+- [ ] Тесты добавлены/обновлены
+- [ ] Документация обновлена
+- [ ] Self-review выполнен
+- [ ] CI проходит
+```
+
+### Именование PR
+
+```bash
+# ✅ ПРАВИЛЬНО
+feat(cart): add quantity selector
+fix(auth): handle expired token
+docs: update API documentation
+
+# ❌ НЕПРАВИЛЬНО
+Update
+Fix bug
+WIP
+```
+
+---
+
+## 🔄 MERGE СТРАТЕГИИ
+
+### Squash Merge (рекомендуется для feature)
+
+```bash
+# Все коммиты ветки сливаются в один
+git merge --squash feature/xxx
+```
+
+**Плюсы:** Чистая история в main, один коммит = одна фича
+**Минусы:** Теряется детальная история ветки
+
+### Merge Commit (для release/hotfix)
+
+```bash
+# Создаётся merge commit
+git merge --no-ff hotfix/xxx
+```
+
+**Плюсы:** Видно откуда пришли изменения
+**Минусы:** Усложняет историю
+
+### Rebase (для обновления feature ветки)
+
+```bash
+# Перебазировать ветку на последний main
+git checkout feature/xxx
+git rebase main
+```
+
+**Плюсы:** Линейная история, нет merge коммитов
+**Минусы:** Изменяет историю, требует force push
+
+### Рекомендации
+
+```markdown
+## Когда что использовать
+
+| Ситуация | Стратегия |
+|----------|-----------|
+| Feature → develop/main | Squash Merge |
+| Hotfix → main | Merge Commit |
+| Develop → main (release) | Merge Commit |
+| Обновление feature ветки | Rebase |
+```
+
+---
+
+## 📋 GIT WORKFLOW
+
+### Начало работы над задачей
+
+```bash
+# 1. Обновить main/develop
+git checkout main
+git pull origin main
+
+# 2. Создать ветку
+git checkout -b feature/add-cart
+
+# 3. Работать, коммитить
+git add .
+git commit -m "feat(cart): add cart page layout"
+git commit -m "feat(cart): implement add to cart"
+git commit -m "test(cart): add cart tests"
+
+# 4. Перед PR — обновить из main
+git fetch origin
+git rebase origin/main
+
+# 5. Push и создать PR
+git push -u origin feature/add-cart
+```
+
+### Исправление после ревью
+
+```bash
+# Добавить фиксы
+git add .
+git commit -m "fix(cart): address review comments"
+
+# ИЛИ amend последний коммит (если мелкие правки)
+git add .
+git commit --amend --no-edit
+git push --force-with-lease
+```
+
+### Синхронизация с main
+
+```bash
+# Rebase (предпочтительно для feature)
+git fetch origin
+git rebase origin/main
+git push --force-with-lease
+
+# ИЛИ Merge (если rebase сложный)
+git fetch origin
+git merge origin/main
+git push
+```
+
+---
+
+## ⚠️ ПРАВИЛА БЕЗОПАСНОСТИ
+
+### ❌ НИКОГДА
+
+```bash
+# ❌ Force push в main/develop
+git push --force origin main
+
+# ❌ Коммит секретов
+git add .env          # Содержит секреты!
+git add config.json   # Может содержать ключи!
+
+# ❌ Изменение истории shared веток
+git rebase main       # Если main уже на сервере
+```
+
+### ✅ БЕЗОПАСНЫЕ ПРАКТИКИ
+
+```bash
+# ✅ Force push только в свою ветку
+git push --force-with-lease origin feature/my-branch
+
+# ✅ Проверка перед коммитом
+git diff --staged     # Что коммитим?
+git status            # Нет ли лишнего?
+
+# ✅ Интерактивный rebase только локально
+git rebase -i HEAD~3  # До push!
+```
+
+---
+
+## 🔧 ПОЛЕЗНЫЕ АЛИАСЫ
+
+```bash
+# ~/.gitconfig
+
+[alias]
+  # Статус и логи
+  st = status -sb
+  lg = log --oneline --graph --decorate -20
+  ll = log --pretty=format:'%C(yellow)%h%Creset %s %C(cyan)<%an>%Creset %C(green)(%cr)%Creset'
+  
+  # Ветки
+  co = checkout
+  cob = checkout -b
+  br = branch -v
+  
+  # Коммиты
+  cm = commit -m
+  ca = commit --amend --no-edit
+  
+  # Sync
+  sync = !git fetch origin && git rebase origin/main
+  
+  # Cleanup
+  cleanup = !git branch --merged | grep -v 'main\\|develop' | xargs git branch -d
+  
+  # Undo
+  undo = reset HEAD~1 --soft
+  unstage = reset HEAD --
+```
+
+---
+
+## 🏷️ ВЕРСИОНИРОВАНИЕ
+
+### Semantic Versioning
+
+```
+MAJOR.MINOR.PATCH
+  │     │     │
+  │     │     └── Patch: баг-фиксы, обратно совместимые
+  │     └──────── Minor: новые фичи, обратно совместимые
+  └────────────── Major: breaking changes
+```
+
+### Git Tags
+
+```bash
+# Создать тег
+git tag -a v1.2.0 -m "Release version 1.2.0"
+
+# Push тег
+git push origin v1.2.0
+
+# Все теги
+git push origin --tags
+```
+
+### CHANGELOG
+
+```markdown
+# Changelog
+
+## [1.2.0] - 2024-01-15
+
+### Added
+- Корзина товаров
+- Checkout процесс
+
+### Fixed
+- Исправлена авторизация
+
+### Changed
+- Обновлён дизайн кнопок
+
+## [1.1.0] - 2024-01-01
+...
+```
+
+---
+
+## 📋 CHECKLIST
+
+### Перед коммитом
+
+- [ ] `git diff --staged` — проверил изменения
+- [ ] Нет `.env`, секретов, API ключей
+- [ ] Нет `console.log`, debug кода
+- [ ] Сообщение следует Conventional Commits
+- [ ] Один коммит = одно логическое изменение
+
+### Перед PR
+
+- [ ] Ветка обновлена из main/develop
+- [ ] Тесты проходят локально
+- [ ] Lint/typecheck проходит
+- [ ] Self-review выполнен
+- [ ] Описание PR заполнено
+- [ ] Связаны задачи (issues)
+
+### Code Review
+
+- [ ] Логика корректна
+- [ ] Код читаемый
+- [ ] Нет дублирования
+- [ ] Тесты адекватные
+- [ ] Нет security issues
+- [ ] Нет performance issues
+
+---
+
+**Версия:** 1.0
+**Дата:** 2025-01-31

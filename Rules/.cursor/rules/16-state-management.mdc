@@ -1,0 +1,713 @@
+---
+description: Правила управления состоянием. Server state, Client state, Form state, URL state.
+globs: ["**/*.tsx", "**/hooks/**", "**/store/**", "**/features/**"]
+alwaysApply: false
+---
+
+# ПРАВИЛА УПРАВЛЕНИЯ СОСТОЯНИЕМ
+
+> Правильное состояние в правильном месте. Не всё нужно хранить в глобальном сторе.
+
+---
+
+## 🎯 ГЛАВНЫЕ ПРИНЦИПЫ
+
+1. **Минимум состояния** — derive когда возможно
+2. **Colocation** — состояние ближе к использованию
+3. **Разделение типов** — server state ≠ client state
+4. **Single Source of Truth** — один источник правды
+
+---
+
+## 📊 ТИПЫ СОСТОЯНИЯ
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      ТИПЫ СОСТОЯНИЯ                         │
+├─────────────────┬─────────────────┬─────────────────────────┤
+│  SERVER STATE   │  CLIENT STATE   │     FORM STATE          │
+│                 │                 │                         │
+│  Данные с API   │  UI состояние   │  Данные формы           │
+│  React Query    │  Zustand        │  React Hook Form        │
+│  SWR            │  Context        │  Formik                 │
+│                 │  useState       │                         │
+├─────────────────┴─────────────────┴─────────────────────────┤
+│                       URL STATE                             │
+│                                                             │
+│  Фильтры, пагинация, модальные окна                         │
+│  useSearchParams, nuqs                                      │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🌐 SERVER STATE (React Query)
+
+### Когда использовать
+
+- Данные с API/backend
+- Данные которые нужно кэшировать
+- Данные которые синхронизируются между вкладками
+
+### Базовая настройка
+
+```typescript
+// lib/query-client.ts
+import { QueryClient } from '@tanstack/react-query';
+
+export const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60,        // 1 минута — данные свежие
+      gcTime: 1000 * 60 * 5,       // 5 минут — хранить в кэше
+      retry: 1,                    // 1 ретрай на ошибку
+      refetchOnWindowFocus: false, // Не рефетчить при фокусе
+    },
+    mutations: {
+      retry: 0,
+    },
+  },
+});
+```
+
+### Query Hooks
+
+```typescript
+// features/products/hooks/useProducts.ts
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { productApi } from '../api/productApi';
+import type { ProductFilters, CreateProductDTO } from '../types';
+
+// Query Keys — централизованно
+export const productKeys = {
+  all: ['products'] as const,
+  lists: () => [...productKeys.all, 'list'] as const,
+  list: (filters: ProductFilters) => [...productKeys.lists(), filters] as const,
+  details: () => [...productKeys.all, 'detail'] as const,
+  detail: (id: string) => [...productKeys.details(), id] as const,
+};
+
+// Получение списка
+export function useProducts(filters: ProductFilters) {
+  return useQuery({
+    queryKey: productKeys.list(filters),
+    queryFn: () => productApi.getList(filters),
+    // Placeholder пока грузится
+    placeholderData: (previousData) => previousData,
+  });
+}
+
+// Получение одного продукта
+export function useProduct(id: string) {
+  return useQuery({
+    queryKey: productKeys.detail(id),
+    queryFn: () => productApi.getById(id),
+    enabled: !!id, // Не запускать если нет id
+  });
+}
+
+// Создание продукта
+export function useCreateProduct() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: (data: CreateProductDTO) => productApi.create(data),
+    onSuccess: () => {
+      // Инвалидируем списки
+      queryClient.invalidateQueries({ queryKey: productKeys.lists() });
+    },
+  });
+}
+
+// Обновление продукта
+export function useUpdateProduct() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: UpdateProductDTO }) => 
+      productApi.update(id, data),
+    onSuccess: (updatedProduct) => {
+      // Обновляем кэш детальной страницы
+      queryClient.setQueryData(
+        productKeys.detail(updatedProduct.id),
+        updatedProduct
+      );
+      // Инвалидируем списки
+      queryClient.invalidateQueries({ queryKey: productKeys.lists() });
+    },
+  });
+}
+
+// Удаление
+export function useDeleteProduct() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: (id: string) => productApi.delete(id),
+    onSuccess: (_, deletedId) => {
+      // Удаляем из кэша
+      queryClient.removeQueries({ queryKey: productKeys.detail(deletedId) });
+      // Инвалидируем списки
+      queryClient.invalidateQueries({ queryKey: productKeys.lists() });
+    },
+  });
+}
+```
+
+### Optimistic Updates
+
+```typescript
+export function useToggleFavorite() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: (productId: string) => productApi.toggleFavorite(productId),
+    
+    // Optimistic update
+    onMutate: async (productId) => {
+      // Отменяем текущие запросы
+      await queryClient.cancelQueries({ queryKey: productKeys.detail(productId) });
+      
+      // Сохраняем предыдущее значение
+      const previousProduct = queryClient.getQueryData(
+        productKeys.detail(productId)
+      );
+      
+      // Оптимистично обновляем
+      queryClient.setQueryData(
+        productKeys.detail(productId),
+        (old: Product) => ({
+          ...old,
+          isFavorite: !old.isFavorite,
+        })
+      );
+      
+      return { previousProduct };
+    },
+    
+    // Откат при ошибке
+    onError: (err, productId, context) => {
+      queryClient.setQueryData(
+        productKeys.detail(productId),
+        context?.previousProduct
+      );
+    },
+    
+    // Синхронизация после мутации
+    onSettled: (_, __, productId) => {
+      queryClient.invalidateQueries({ queryKey: productKeys.detail(productId) });
+    },
+  });
+}
+```
+
+---
+
+## 🏠 CLIENT STATE (Zustand)
+
+### Когда использовать
+
+- UI состояние (тема, sidebar открыт)
+- Корзина покупок
+- Данные авторизованного пользователя
+- Состояние которое НЕ с сервера
+
+### Базовый store
+
+```typescript
+// store/useCartStore.ts
+import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import { immer } from 'zustand/middleware/immer';
+
+interface CartItem {
+  productId: string;
+  name: string;
+  price: number;
+  quantity: number;
+}
+
+interface CartState {
+  items: CartItem[];
+  isOpen: boolean;
+}
+
+interface CartActions {
+  addItem: (item: Omit<CartItem, 'quantity'>) => void;
+  removeItem: (productId: string) => void;
+  updateQuantity: (productId: string, quantity: number) => void;
+  clearCart: () => void;
+  toggleCart: () => void;
+}
+
+export const useCartStore = create<CartState & CartActions>()(
+  persist(
+    immer((set) => ({
+      // State
+      items: [],
+      isOpen: false,
+
+      // Actions
+      addItem: (item) =>
+        set((state) => {
+          const existingItem = state.items.find(
+            (i) => i.productId === item.productId
+          );
+          
+          if (existingItem) {
+            existingItem.quantity += 1;
+          } else {
+            state.items.push({ ...item, quantity: 1 });
+          }
+        }),
+
+      removeItem: (productId) =>
+        set((state) => {
+          state.items = state.items.filter((i) => i.productId !== productId);
+        }),
+
+      updateQuantity: (productId, quantity) =>
+        set((state) => {
+          const item = state.items.find((i) => i.productId === productId);
+          if (item) {
+            if (quantity <= 0) {
+              state.items = state.items.filter((i) => i.productId !== productId);
+            } else {
+              item.quantity = quantity;
+            }
+          }
+        }),
+
+      clearCart: () =>
+        set((state) => {
+          state.items = [];
+        }),
+
+      toggleCart: () =>
+        set((state) => {
+          state.isOpen = !state.isOpen;
+        }),
+    })),
+    {
+      name: 'cart-storage',
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({ items: state.items }), // Только items в storage
+    }
+  )
+);
+
+// Селекторы (вычисляемые значения)
+export const useCartTotal = () =>
+  useCartStore((state) =>
+    state.items.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  );
+
+export const useCartItemCount = () =>
+  useCartStore((state) =>
+    state.items.reduce((sum, item) => sum + item.quantity, 0)
+  );
+```
+
+### Использование
+
+```tsx
+// components/CartButton.tsx
+'use client';
+
+import { useCartStore, useCartItemCount } from '@/store/useCartStore';
+
+export function CartButton() {
+  const toggleCart = useCartStore((state) => state.toggleCart);
+  const itemCount = useCartItemCount();
+
+  return (
+    <button onClick={toggleCart} className="relative">
+      <ShoppingCartIcon />
+      {itemCount > 0 && (
+        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5">
+          {itemCount}
+        </span>
+      )}
+    </button>
+  );
+}
+```
+
+### Store для UI состояния
+
+```typescript
+// store/useUIStore.ts
+import { create } from 'zustand';
+
+interface UIState {
+  sidebarOpen: boolean;
+  theme: 'light' | 'dark' | 'system';
+  modalStack: string[];
+}
+
+interface UIActions {
+  toggleSidebar: () => void;
+  setTheme: (theme: UIState['theme']) => void;
+  openModal: (modalId: string) => void;
+  closeModal: (modalId?: string) => void;
+}
+
+export const useUIStore = create<UIState & UIActions>((set) => ({
+  sidebarOpen: true,
+  theme: 'system',
+  modalStack: [],
+
+  toggleSidebar: () =>
+    set((state) => ({ sidebarOpen: !state.sidebarOpen })),
+
+  setTheme: (theme) => set({ theme }),
+
+  openModal: (modalId) =>
+    set((state) => ({ modalStack: [...state.modalStack, modalId] })),
+
+  closeModal: (modalId) =>
+    set((state) => ({
+      modalStack: modalId
+        ? state.modalStack.filter((id) => id !== modalId)
+        : state.modalStack.slice(0, -1),
+    })),
+}));
+```
+
+---
+
+## 📝 FORM STATE (React Hook Form)
+
+### Когда использовать
+
+- Любые формы
+- Валидация
+- Сложная логика форм
+
+### Базовая форма
+
+```tsx
+// components/ProductForm.tsx
+'use client';
+
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+
+const productSchema = z.object({
+  name: z.string().min(1, 'Название обязательно').max(255),
+  description: z.string().max(5000).optional(),
+  price: z.number().min(0, 'Цена не может быть отрицательной'),
+  categoryId: z.string().uuid('Выберите категорию'),
+  isActive: z.boolean().default(true),
+});
+
+type ProductFormData = z.infer<typeof productSchema>;
+
+interface Props {
+  defaultValues?: Partial<ProductFormData>;
+  onSubmit: (data: ProductFormData) => Promise<void>;
+}
+
+export function ProductForm({ defaultValues, onSubmit }: Props) {
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+    reset,
+  } = useForm<ProductFormData>({
+    resolver: zodResolver(productSchema),
+    defaultValues: {
+      name: '',
+      description: '',
+      price: 0,
+      isActive: true,
+      ...defaultValues,
+    },
+  });
+
+  const onSubmitHandler = async (data: ProductFormData) => {
+    try {
+      await onSubmit(data);
+      reset();
+    } catch (error) {
+      // Ошибка обрабатывается выше
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit(onSubmitHandler)} className="space-y-4">
+      <div>
+        <label htmlFor="name" className="block text-sm font-medium">
+          Название
+        </label>
+        <input
+          {...register('name')}
+          id="name"
+          className="mt-1 block w-full rounded-md border p-2"
+        />
+        {errors.name && (
+          <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>
+        )}
+      </div>
+
+      <div>
+        <label htmlFor="price" className="block text-sm font-medium">
+          Цена
+        </label>
+        <input
+          {...register('price', { valueAsNumber: true })}
+          id="price"
+          type="number"
+          className="mt-1 block w-full rounded-md border p-2"
+        />
+        {errors.price && (
+          <p className="mt-1 text-sm text-red-600">{errors.price.message}</p>
+        )}
+      </div>
+
+      <button
+        type="submit"
+        disabled={isSubmitting}
+        className="w-full rounded-md bg-primary-600 py-2 text-white disabled:opacity-50"
+      >
+        {isSubmitting ? 'Сохранение...' : 'Сохранить'}
+      </button>
+    </form>
+  );
+}
+```
+
+### Form с React Query
+
+```tsx
+// Интеграция формы с мутацией
+export function CreateProductForm() {
+  const createProduct = useCreateProduct();
+  
+  const handleSubmit = async (data: ProductFormData) => {
+    await createProduct.mutateAsync(data);
+  };
+  
+  return (
+    <ProductForm 
+      onSubmit={handleSubmit}
+      // Показываем ошибку от сервера
+      serverError={createProduct.error?.message}
+    />
+  );
+}
+```
+
+---
+
+## 🔗 URL STATE
+
+### Когда использовать
+
+- Фильтры и сортировка
+- Пагинация
+- Состояние которое должно сохраняться в URL
+- Shareable состояние
+
+### useSearchParams (Next.js)
+
+```tsx
+// features/products/components/ProductFilters.tsx
+'use client';
+
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
+import { useCallback } from 'react';
+
+export function ProductFilters() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  
+  // Текущие значения из URL
+  const category = searchParams.get('category') ?? '';
+  const sort = searchParams.get('sort') ?? 'createdAt';
+  const page = Number(searchParams.get('page')) || 1;
+
+  // Обновление URL
+  const updateFilters = useCallback(
+    (updates: Record<string, string | number | null>) => {
+      const params = new URLSearchParams(searchParams.toString());
+      
+      Object.entries(updates).forEach(([key, value]) => {
+        if (value === null || value === '') {
+          params.delete(key);
+        } else {
+          params.set(key, String(value));
+        }
+      });
+      
+      // Сбрасываем страницу при изменении фильтров
+      if (!('page' in updates)) {
+        params.delete('page');
+      }
+      
+      router.push(`${pathname}?${params.toString()}`);
+    },
+    [router, pathname, searchParams]
+  );
+
+  return (
+    <div className="flex gap-4">
+      <select
+        value={category}
+        onChange={(e) => updateFilters({ category: e.target.value })}
+      >
+        <option value="">Все категории</option>
+        <option value="electronics">Электроника</option>
+        <option value="clothing">Одежда</option>
+      </select>
+
+      <select
+        value={sort}
+        onChange={(e) => updateFilters({ sort: e.target.value })}
+      >
+        <option value="createdAt">По дате</option>
+        <option value="price">По цене</option>
+        <option value="name">По названию</option>
+      </select>
+    </div>
+  );
+}
+```
+
+### nuqs (Type-safe URL state)
+
+```tsx
+// Более удобный способ с nuqs
+import { useQueryState, parseAsInteger, parseAsString } from 'nuqs';
+
+export function ProductFilters() {
+  const [category, setCategory] = useQueryState('category');
+  const [sort, setSort] = useQueryState('sort', parseAsString.withDefault('createdAt'));
+  const [page, setPage] = useQueryState('page', parseAsInteger.withDefault(1));
+
+  return (
+    <div className="flex gap-4">
+      <select
+        value={category ?? ''}
+        onChange={(e) => setCategory(e.target.value || null)}
+      >
+        <option value="">Все категории</option>
+        <option value="electronics">Электроника</option>
+      </select>
+      
+      <Pagination
+        currentPage={page}
+        onPageChange={setPage}
+      />
+    </div>
+  );
+}
+```
+
+---
+
+## 🚫 АНТИПАТТЕРНЫ
+
+### ❌ Не делай
+
+```tsx
+// ❌ Server data в глобальном сторе
+const useStore = create((set) => ({
+  products: [],
+  fetchProducts: async () => {
+    const products = await api.getProducts();
+    set({ products });
+  },
+}));
+
+// ❌ Дублирование состояния
+const [localUser, setLocalUser] = useState(user); // user уже есть!
+
+// ❌ Derived state в useState
+const [total, setTotal] = useState(0);
+useEffect(() => {
+  setTotal(items.reduce((sum, i) => sum + i.price, 0));
+}, [items]);
+
+// ❌ Слишком много в глобальном сторе
+const useStore = create((set) => ({
+  user: null,
+  products: [],
+  orders: [],
+  cart: [],
+  notifications: [],
+  // ... всё в одном месте
+}));
+```
+
+### ✅ Делай
+
+```tsx
+// ✅ Server data через React Query
+const { data: products } = useProducts();
+
+// ✅ Используй исходные данные
+<UserProfile user={user} />
+
+// ✅ Derive state
+const total = items.reduce((sum, i) => sum + i.price, 0);
+
+// ✅ Разделяй сторы по доменам
+const useCartStore = create(...);
+const useUIStore = create(...);
+const useAuthStore = create(...);
+```
+
+---
+
+## 📋 ВЫБОР ТИПА СОСТОЯНИЯ
+
+```markdown
+## Дерево решений
+
+Данные с сервера?
+├── Да → React Query / SWR
+└── Нет
+    └── Нужно в URL?
+        ├── Да → useSearchParams / nuqs
+        └── Нет
+            └── Нужно глобально?
+                ├── Да → Zustand
+                └── Нет
+                    └── Данные формы?
+                        ├── Да → React Hook Form
+                        └── Нет → useState
+```
+
+---
+
+## 📋 CHECKLIST
+
+### Общие правила
+
+- [ ] Server state в React Query
+- [ ] Client state в Zustand (если нужно глобально)
+- [ ] Form state в React Hook Form
+- [ ] URL state для фильтров/пагинации
+- [ ] Derive state вместо дублирования
+- [ ] Селекторы для оптимизации ререндеров
+
+### React Query
+
+- [ ] Query Keys централизованы
+- [ ] staleTime/gcTime настроены
+- [ ] Optimistic updates где нужно
+- [ ] Error handling настроен
+
+### Zustand
+
+- [ ] Сторы разделены по доменам
+- [ ] persist для нужных данных
+- [ ] Селекторы для granular updates
+
+---
+
+**Версия:** 1.0
+**Дата:** 2025-01-31

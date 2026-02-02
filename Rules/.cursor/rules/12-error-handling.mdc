@@ -1,0 +1,831 @@
+---
+description: Правила обработки ошибок. Централизованная и консистентная обработка ошибок на всех уровнях.
+globs: ["**/*.ts", "**/*.tsx"]
+alwaysApply: false
+---
+
+# ПРАВИЛА ОБРАБОТКИ ОШИБОК
+
+> Ошибки — это не исключение, а часть нормального потока. Обрабатывай их правильно.
+
+---
+
+## 🎯 ГЛАВНЫЕ ПРИНЦИПЫ
+
+1. **Централизация** — единый механизм обработки ошибок
+2. **Типизация** — кастомные классы ошибок
+3. **Информативность** — понятные сообщения с контекстом
+4. **Graceful Degradation** — приложение работает даже при ошибках
+
+---
+
+## 🏗️ АРХИТЕКТУРА ОШИБОК
+
+### Иерархия классов ошибок
+
+```typescript
+// lib/errors/base.error.ts
+
+/**
+ * Базовый класс для всех ошибок приложения
+ */
+export abstract class AppError extends Error {
+  abstract readonly statusCode: number;
+  abstract readonly code: string;
+  readonly isOperational: boolean = true;
+  readonly timestamp: Date = new Date();
+  
+  constructor(
+    message: string,
+    public readonly context?: Record<string, unknown>,
+  ) {
+    super(message);
+    this.name = this.constructor.name;
+    Error.captureStackTrace(this, this.constructor);
+  }
+
+  toJSON() {
+    return {
+      name: this.name,
+      code: this.code,
+      message: this.message,
+      statusCode: this.statusCode,
+      timestamp: this.timestamp.toISOString(),
+      ...(this.context && { context: this.context }),
+    };
+  }
+}
+```
+
+### Типы ошибок
+
+```typescript
+// lib/errors/http.errors.ts
+
+// 400 Bad Request — невалидные данные
+export class ValidationError extends AppError {
+  readonly statusCode = 400;
+  readonly code = 'VALIDATION_ERROR';
+  
+  constructor(
+    message: string,
+    public readonly errors: FieldError[] = [],
+  ) {
+    super(message, { errors });
+  }
+}
+
+interface FieldError {
+  field: string;
+  code: string;
+  message: string;
+  value?: unknown;
+}
+
+// 401 Unauthorized — не аутентифицирован
+export class UnauthorizedError extends AppError {
+  readonly statusCode = 401;
+  readonly code = 'UNAUTHORIZED';
+  
+  constructor(message = 'Authentication required') {
+    super(message);
+  }
+}
+
+// 403 Forbidden — нет прав
+export class ForbiddenError extends AppError {
+  readonly statusCode = 403;
+  readonly code = 'FORBIDDEN';
+  
+  constructor(message = 'Access denied') {
+    super(message);
+  }
+}
+
+// 404 Not Found — ресурс не найден
+export class NotFoundError extends AppError {
+  readonly statusCode = 404;
+  readonly code = 'NOT_FOUND';
+  
+  constructor(
+    resource: string,
+    identifier?: string | number,
+  ) {
+    const message = identifier
+      ? `${resource} with id '${identifier}' not found`
+      : `${resource} not found`;
+    super(message, { resource, identifier });
+  }
+}
+
+// 409 Conflict — конфликт (дубликат)
+export class ConflictError extends AppError {
+  readonly statusCode = 409;
+  readonly code = 'CONFLICT';
+  
+  constructor(message: string) {
+    super(message);
+  }
+}
+
+// 422 Unprocessable Entity — бизнес-логика
+export class BusinessError extends AppError {
+  readonly statusCode = 422;
+  
+  constructor(
+    message: string,
+    public readonly code: string,
+    context?: Record<string, unknown>,
+  ) {
+    super(message, context);
+  }
+}
+
+// 429 Too Many Requests — rate limit
+export class RateLimitError extends AppError {
+  readonly statusCode = 429;
+  readonly code = 'RATE_LIMITED';
+  
+  constructor(
+    public readonly retryAfter?: number,
+  ) {
+    super('Too many requests', { retryAfter });
+  }
+}
+
+// 500 Internal Server Error — неожиданная ошибка
+export class InternalError extends AppError {
+  readonly statusCode = 500;
+  readonly code = 'INTERNAL_ERROR';
+  readonly isOperational = false;
+  
+  constructor(message = 'Internal server error') {
+    super(message);
+  }
+}
+
+// 503 Service Unavailable — сервис недоступен
+export class ServiceUnavailableError extends AppError {
+  readonly statusCode = 503;
+  readonly code = 'SERVICE_UNAVAILABLE';
+  
+  constructor(service: string) {
+    super(`${service} is temporarily unavailable`, { service });
+  }
+}
+```
+
+### Доменные ошибки
+
+```typescript
+// features/orders/errors.ts
+
+export class InsufficientStockError extends BusinessError {
+  constructor(
+    productId: string,
+    requested: number,
+    available: number,
+  ) {
+    super(
+      `Insufficient stock for product ${productId}`,
+      'INSUFFICIENT_STOCK',
+      { productId, requested, available },
+    );
+  }
+}
+
+export class OrderAlreadyPaidError extends BusinessError {
+  constructor(orderId: string) {
+    super(
+      `Order ${orderId} is already paid`,
+      'ORDER_ALREADY_PAID',
+      { orderId },
+    );
+  }
+}
+
+export class InvalidOrderStatusError extends BusinessError {
+  constructor(
+    orderId: string,
+    currentStatus: string,
+    expectedStatuses: string[],
+  ) {
+    super(
+      `Order ${orderId} has status '${currentStatus}', expected one of: ${expectedStatuses.join(', ')}`,
+      'INVALID_ORDER_STATUS',
+      { orderId, currentStatus, expectedStatuses },
+    );
+  }
+}
+```
+
+---
+
+## 🔧 BACKEND: ОБРАБОТКА ОШИБОК
+
+### NestJS Global Exception Filter
+
+```typescript
+// common/filters/all-exceptions.filter.ts
+import {
+  ExceptionFilter,
+  Catch,
+  ArgumentsHost,
+  HttpException,
+  HttpStatus,
+  Logger,
+} from '@nestjs/common';
+import { Request, Response } from 'express';
+import { Prisma } from '@prisma/client';
+import { AppError } from '../errors/base.error';
+
+@Catch()
+export class AllExceptionsFilter implements ExceptionFilter {
+  private readonly logger = new Logger('ExceptionFilter');
+
+  catch(exception: unknown, host: ArgumentsHost) {
+    const ctx = host.switchToHttp();
+    const response = ctx.getResponse<Response>();
+    const request = ctx.getRequest<Request>();
+
+    const errorResponse = this.buildErrorResponse(exception, request);
+    
+    this.logError(exception, request, errorResponse);
+    
+    response.status(errorResponse.statusCode).json(errorResponse);
+  }
+
+  private buildErrorResponse(exception: unknown, request: Request) {
+    const requestId = request.headers['x-request-id'] as string;
+    const timestamp = new Date().toISOString();
+    const path = request.url;
+    const method = request.method;
+
+    // Наша кастомная ошибка
+    if (exception instanceof AppError) {
+      return {
+        statusCode: exception.statusCode,
+        code: exception.code,
+        message: exception.message,
+        ...(exception.context && { details: exception.context }),
+        timestamp,
+        path,
+        requestId,
+      };
+    }
+
+    // NestJS HttpException
+    if (exception instanceof HttpException) {
+      const status = exception.getStatus();
+      const exceptionResponse = exception.getResponse();
+      
+      return {
+        statusCode: status,
+        code: this.getCodeFromStatus(status),
+        message: typeof exceptionResponse === 'string'
+          ? exceptionResponse
+          : (exceptionResponse as any).message,
+        ...(typeof exceptionResponse === 'object' && {
+          details: (exceptionResponse as any).errors,
+        }),
+        timestamp,
+        path,
+        requestId,
+      };
+    }
+
+    // Prisma ошибки
+    if (exception instanceof Prisma.PrismaClientKnownRequestError) {
+      const prismaError = this.handlePrismaError(exception);
+      return {
+        ...prismaError,
+        timestamp,
+        path,
+        requestId,
+      };
+    }
+
+    // Неизвестная ошибка
+    return {
+      statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+      code: 'INTERNAL_ERROR',
+      message: 'An unexpected error occurred',
+      timestamp,
+      path,
+      requestId,
+    };
+  }
+
+  private handlePrismaError(error: Prisma.PrismaClientKnownRequestError) {
+    switch (error.code) {
+      case 'P2002': // Unique constraint
+        return {
+          statusCode: 409,
+          code: 'CONFLICT',
+          message: 'Resource already exists',
+          details: { fields: error.meta?.target },
+        };
+      case 'P2025': // Record not found
+        return {
+          statusCode: 404,
+          code: 'NOT_FOUND',
+          message: 'Resource not found',
+        };
+      case 'P2003': // Foreign key constraint
+        return {
+          statusCode: 400,
+          code: 'INVALID_REFERENCE',
+          message: 'Referenced resource does not exist',
+        };
+      default:
+        return {
+          statusCode: 500,
+          code: 'DATABASE_ERROR',
+          message: 'Database operation failed',
+        };
+    }
+  }
+
+  private getCodeFromStatus(status: number): string {
+    const codes: Record<number, string> = {
+      400: 'BAD_REQUEST',
+      401: 'UNAUTHORIZED',
+      403: 'FORBIDDEN',
+      404: 'NOT_FOUND',
+      409: 'CONFLICT',
+      422: 'UNPROCESSABLE_ENTITY',
+      429: 'RATE_LIMITED',
+      500: 'INTERNAL_ERROR',
+    };
+    return codes[status] || 'ERROR';
+  }
+
+  private logError(
+    exception: unknown,
+    request: Request,
+    errorResponse: any,
+  ) {
+    const { statusCode, code, message } = errorResponse;
+    const { method, url, body, headers } = request;
+    
+    const logContext = {
+      statusCode,
+      code,
+      method,
+      url,
+      requestId: headers['x-request-id'],
+      userId: (request as any).user?.id,
+    };
+
+    // 5xx — ERROR, 4xx — WARN
+    if (statusCode >= 500) {
+      this.logger.error(
+        `${method} ${url} - ${statusCode} ${code}: ${message}`,
+        exception instanceof Error ? exception.stack : undefined,
+        logContext,
+      );
+    } else {
+      this.logger.warn(
+        `${method} ${url} - ${statusCode} ${code}: ${message}`,
+        logContext,
+      );
+    }
+  }
+}
+```
+
+### Регистрация фильтра
+
+```typescript
+// main.ts
+import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+  
+  app.useGlobalFilters(new AllExceptionsFilter());
+  
+  await app.listen(3000);
+}
+```
+
+---
+
+## 🎨 FRONTEND: ОБРАБОТКА ОШИБОК
+
+### Error Boundary (React)
+
+```tsx
+// components/ErrorBoundary.tsx
+'use client';
+
+import { Component, ReactNode } from 'react';
+import { Button } from '@/shared/components/ui';
+import { logger } from '@/lib/logger';
+
+interface Props {
+  children: ReactNode;
+  fallback?: ReactNode;
+  onError?: (error: Error, errorInfo: React.ErrorInfo) => void;
+}
+
+interface State {
+  hasError: boolean;
+  error?: Error;
+}
+
+export class ErrorBoundary extends Component<Props, State> {
+  state: State = { hasError: false };
+
+  static getDerivedStateFromError(error: Error): State {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    // Логируем ошибку
+    logger.error('React Error Boundary caught error', {
+      error: error.message,
+      stack: error.stack,
+      componentStack: errorInfo.componentStack,
+    });
+    
+    // Callback для родителя
+    this.props.onError?.(error, errorInfo);
+  }
+
+  handleRetry = () => {
+    this.setState({ hasError: false, error: undefined });
+  };
+
+  render() {
+    if (this.state.hasError) {
+      if (this.props.fallback) {
+        return this.props.fallback;
+      }
+      
+      return (
+        <div className="flex flex-col items-center justify-center min-h-[200px] p-8">
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">
+            Что-то пошло не так
+          </h2>
+          <p className="text-gray-600 mb-4 text-center">
+            Произошла ошибка при отображении этого раздела.
+          </p>
+          <Button onClick={this.handleRetry}>
+            Попробовать снова
+          </Button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+```
+
+### Использование Error Boundary
+
+```tsx
+// app/layout.tsx
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+
+export default function RootLayout({ children }: { children: ReactNode }) {
+  return (
+    <html>
+      <body>
+        <ErrorBoundary>
+          {children}
+        </ErrorBoundary>
+      </body>
+    </html>
+  );
+}
+
+// Для отдельных секций
+<ErrorBoundary fallback={<ProductListSkeleton />}>
+  <ProductList />
+</ErrorBoundary>
+```
+
+### API Error Handler
+
+```typescript
+// lib/api/error-handler.ts
+
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public readonly statusCode: number,
+    public readonly code: string,
+    public readonly details?: unknown,
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+
+  static fromResponse(data: any, status: number): ApiError {
+    return new ApiError(
+      data.message || 'Unknown error',
+      status,
+      data.code || 'UNKNOWN',
+      data.details,
+    );
+  }
+  
+  get isNotFound() {
+    return this.statusCode === 404;
+  }
+  
+  get isUnauthorized() {
+    return this.statusCode === 401;
+  }
+  
+  get isForbidden() {
+    return this.statusCode === 403;
+  }
+  
+  get isValidationError() {
+    return this.statusCode === 400;
+  }
+  
+  get isServerError() {
+    return this.statusCode >= 500;
+  }
+}
+
+// API client с обработкой ошибок
+export async function apiRequest<T>(
+  url: string,
+  options?: RequestInit,
+): Promise<T> {
+  try {
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers,
+      },
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw ApiError.fromResponse(data, response.status);
+    }
+
+    return data.data as T;
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    
+    // Network error или другое
+    throw new ApiError(
+      'Network error. Please check your connection.',
+      0,
+      'NETWORK_ERROR',
+    );
+  }
+}
+```
+
+### React Query Error Handling
+
+```tsx
+// lib/query-client.ts
+import { QueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { ApiError } from './api/error-handler';
+
+export const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: (failureCount, error) => {
+        // Не ретраить 4xx ошибки
+        if (error instanceof ApiError && error.statusCode < 500) {
+          return false;
+        }
+        return failureCount < 3;
+      },
+      staleTime: 1000 * 60, // 1 минута
+    },
+    mutations: {
+      onError: (error) => {
+        if (error instanceof ApiError) {
+          // Показываем toast с ошибкой
+          toast.error(error.message);
+          
+          // Redirect на логин при 401
+          if (error.isUnauthorized) {
+            window.location.href = '/login';
+          }
+        } else {
+          toast.error('Произошла ошибка. Попробуйте позже.');
+        }
+      },
+    },
+  },
+});
+```
+
+### Обработка ошибок в компонентах
+
+```tsx
+// features/products/components/ProductList.tsx
+'use client';
+
+import { useProducts } from '../hooks/useProducts';
+import { ApiError } from '@/lib/api/error-handler';
+
+export function ProductList() {
+  const { data, error, isLoading, refetch } = useProducts();
+
+  // Loading state
+  if (isLoading) {
+    return <ProductListSkeleton />;
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="text-center py-8">
+        {error instanceof ApiError ? (
+          <>
+            <p className="text-red-600 mb-4">{error.message}</p>
+            {error.isServerError && (
+              <Button onClick={() => refetch()}>
+                Попробовать снова
+              </Button>
+            )}
+          </>
+        ) : (
+          <p className="text-red-600">Произошла ошибка</p>
+        )}
+      </div>
+    );
+  }
+
+  // Empty state
+  if (!data?.length) {
+    return <EmptyState message="Товары не найдены" />;
+  }
+
+  // Success state
+  return (
+    <div className="grid grid-cols-3 gap-4">
+      {data.map(product => (
+        <ProductCard key={product.id} product={product} />
+      ))}
+    </div>
+  );
+}
+```
+
+---
+
+## 🔄 RETRY СТРАТЕГИИ
+
+### Exponential Backoff
+
+```typescript
+// lib/utils/retry.ts
+
+interface RetryOptions {
+  maxRetries?: number;
+  baseDelay?: number;
+  maxDelay?: number;
+  shouldRetry?: (error: Error) => boolean;
+}
+
+export async function withRetry<T>(
+  fn: () => Promise<T>,
+  options: RetryOptions = {},
+): Promise<T> {
+  const {
+    maxRetries = 3,
+    baseDelay = 1000,
+    maxDelay = 30000,
+    shouldRetry = () => true,
+  } = options;
+
+  let lastError: Error;
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error as Error;
+      
+      // Не ретраим если не нужно
+      if (!shouldRetry(lastError) || attempt === maxRetries) {
+        throw lastError;
+      }
+      
+      // Exponential backoff с jitter
+      const delay = Math.min(
+        baseDelay * Math.pow(2, attempt) + Math.random() * 1000,
+        maxDelay,
+      );
+      
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  
+  throw lastError!;
+}
+
+// Использование
+const data = await withRetry(
+  () => fetchData(url),
+  {
+    maxRetries: 3,
+    shouldRetry: (error) => {
+      // Ретраим только серверные ошибки
+      return error instanceof ApiError && error.statusCode >= 500;
+    },
+  },
+);
+```
+
+---
+
+## 📋 ПРАВИЛА ОБРАБОТКИ ОШИБОК
+
+### ✅ ДЕЛАЙ
+
+```typescript
+// ✅ Конкретные типы ошибок
+throw new NotFoundError('User', userId);
+
+// ✅ Информативные сообщения
+throw new ValidationError('Invalid email format', [
+  { field: 'email', code: 'INVALID_FORMAT', message: 'Email must be valid' }
+]);
+
+// ✅ Логирование с контекстом
+logger.error('Payment failed', { orderId, amount, errorCode: err.code });
+
+// ✅ Graceful degradation
+try {
+  const recommendations = await getRecommendations();
+  return recommendations;
+} catch (error) {
+  // Вернуть пустой массив вместо падения
+  return [];
+}
+
+// ✅ Проверка типа ошибки
+if (error instanceof NotFoundError) {
+  // Обработка 404
+}
+```
+
+### ❌ НЕ ДЕЛАЙ
+
+```typescript
+// ❌ Глушение ошибок
+try {
+  await doSomething();
+} catch (error) {
+  // Пустой catch = потеря информации
+}
+
+// ❌ Неинформативные сообщения
+throw new Error('Error');
+throw new Error('Something went wrong');
+
+// ❌ Логирование чувствительных данных
+logger.error('Login failed', { email, password }); // ❌ password!
+
+// ❌ Использование any для ошибок
+catch (error: any) {
+  console.log(error.message); // Может быть undefined
+}
+```
+
+---
+
+## 📋 CHECKLIST
+
+### Backend
+
+- [ ] Создан базовый класс `AppError`
+- [ ] Созданы специфичные классы ошибок (NotFoundError, etc.)
+- [ ] Настроен GlobalExceptionFilter
+- [ ] Prisma ошибки обрабатываются корректно
+- [ ] Логирование ошибок с контекстом
+- [ ] Нет чувствительных данных в логах
+
+### Frontend
+
+- [ ] ErrorBoundary на верхнем уровне
+- [ ] ErrorBoundary для критических секций
+- [ ] API клиент с обработкой ошибок
+- [ ] React Query настроен с retry логикой
+- [ ] Пользователю показываются понятные сообщения
+- [ ] Есть возможность повторить действие
+
+---
+
+**Версия:** 1.0
+**Дата:** 2025-01-31
