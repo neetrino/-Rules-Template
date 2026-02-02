@@ -1,0 +1,194 @@
+# Настройка платформ для Production
+
+> Полное руководство по настройке всех платформ и сервисов для запуска проекта в production.
+
+**Последнее обновление:** 2025-01-31
+
+---
+
+## 📋 СПИСОК ПЛАТФОРМ
+
+### Frontend Hosting
+
+| Платформа | Файл | Когда использовать |
+|-----------|------|-------------------|
+| **Vercel** | [01-VERCEL.md](./01-VERCEL.md) | Next.js проекты, основной выбор |
+
+### Backend Hosting
+
+| Платформа | Файл | Когда использовать |
+|-----------|------|-------------------|
+| **Railway** | [04-RAILWAY.md](./04-RAILWAY.md) | Простой backend, хороший DX |
+| **Render** | [05-RENDER.md](./05-RENDER.md) | Есть бесплатный tier |
+| **Fly.io** | [06-FLYIO.md](./06-FLYIO.md) | Global edge, low latency |
+
+### Database
+
+| Платформа | Файл | Когда использовать |
+|-----------|------|-------------------|
+| **Neon** | [02-NEON.md](./02-NEON.md) | Serverless Postgres, основной выбор |
+
+### CDN и Storage
+
+| Платформа | Файл | Когда использовать |
+|-----------|------|-------------------|
+| **Cloudflare** | [03-CLOUDFLARE.md](./03-CLOUDFLARE.md) | CDN, R2 storage, WAF, DNS |
+
+### DevOps и Мониторинг
+
+| Платформа | Файл | Когда использовать |
+|-----------|------|-------------------|
+| **GitHub** | [07-GITHUB.md](./07-GITHUB.md) | CI/CD, Secrets, Environments |
+| **Sentry** | [08-SENTRY.md](./08-SENTRY.md) | Error tracking, monitoring |
+
+---
+
+## 🎯 ТИПИЧНЫЕ КОНФИГУРАЦИИ
+
+### Малый проект (A)
+
+```
+Frontend:  Vercel
+Database:  Neon (Free tier)
+Storage:   Vercel Blob или Cloudflare R2
+CI/CD:     Vercel (встроенный)
+```
+
+### Средний проект (B)
+
+```
+Frontend:  Vercel
+Backend:   Railway или Vercel (API Routes)
+Database:  Neon (Pro)
+Storage:   Cloudflare R2
+CDN:       Cloudflare
+CI/CD:     GitHub Actions + Vercel
+Monitoring: Sentry
+```
+
+### Крупный проект (C)
+
+```
+Frontend:  Vercel (Pro)
+Backend:   Railway / Fly.io
+Database:  Neon (Scale) + Redis
+Storage:   Cloudflare R2
+CDN:       Cloudflare (Pro)
+CI/CD:     GitHub Actions
+Monitoring: Sentry + Vercel Analytics
+```
+
+---
+
+## ✅ ОБЩИЙ CHECKLIST НАСТРОЙКИ
+
+### Перед запуском проекта
+
+- [ ] **Accounts созданы:**
+  - [ ] Vercel
+  - [ ] Neon
+  - [ ] Cloudflare (если нужен)
+  - [ ] Railway/Render/Fly.io (если backend)
+  - [ ] Sentry (если нужен)
+
+- [ ] **GitHub настроен:**
+  - [ ] Repository создан
+  - [ ] Secrets добавлены
+  - [ ] Environments настроены
+
+### При деплое
+
+- [ ] **Vercel:**
+  - [ ] Проект подключён к GitHub
+  - [ ] Environment Variables настроены
+  - [ ] Domain настроен
+
+- [ ] **Neon:**
+  - [ ] Database создана
+  - [ ] Production branch создан
+  - [ ] Connection string в Vercel/Railway
+
+- [ ] **Cloudflare (если используется):**
+  - [ ] DNS записи настроены
+  - [ ] SSL/TLS mode: Full (strict)
+  - [ ] WAF rules настроены
+
+### После деплоя
+
+- [ ] **Мониторинг:**
+  - [ ] Sentry подключён
+  - [ ] Analytics работает
+  - [ ] Alerts настроены
+
+---
+
+## 🔐 БЕЗОПАСНОСТЬ
+
+### Secrets Management
+
+```markdown
+## Где хранить секреты
+
+| Секрет | Где хранить |
+|--------|-------------|
+| DATABASE_URL | Vercel/Railway Environment Variables |
+| API Keys | Vercel/Railway Environment Variables |
+| JWT_SECRET | Vercel/Railway Environment Variables |
+| Webhook secrets | Platform-specific |
+
+## НИКОГДА
+
+- ❌ В коде
+- ❌ В .env в git
+- ❌ В публичных логах
+- ❌ В GitHub Issues/PR
+```
+
+### Environment Separation
+
+```markdown
+## Environments
+
+| Environment | Использование | Database |
+|-------------|---------------|----------|
+| Development | Локальная разработка | Neon dev branch |
+| Preview | PR previews | Neon preview branch |
+| Staging | Тестирование | Neon staging branch |
+| Production | Боевой сервер | Neon main branch |
+```
+
+---
+
+## 📖 ПОРЯДОК НАСТРОЙКИ
+
+### Для нового проекта:
+
+```
+1. GitHub     → Создать repo, настроить secrets
+2. Neon       → Создать database
+3. Vercel     → Подключить repo, настроить env vars
+4. Cloudflare → DNS, CDN (опционально)
+5. Railway    → Backend (если нужен)
+6. Sentry     → Мониторинг (опционально)
+```
+
+---
+
+## 📁 ФАЙЛЫ В ЭТОЙ ПАПКЕ
+
+```
+Settings/
+├── 00-PLATFORMS.md      # ← Этот файл (оглавление)
+├── 01-VERCEL.md         # Vercel настройка
+├── 02-NEON.md           # Neon Database настройка
+├── 03-CLOUDFLARE.md     # Cloudflare настройка
+├── 04-RAILWAY.md        # Railway настройка
+├── 05-RENDER.md         # Render настройка
+├── 06-FLYIO.md          # Fly.io настройка
+├── 07-GITHUB.md         # GitHub Actions, Secrets
+└── 08-SENTRY.md         # Sentry мониторинг
+```
+
+---
+
+**Версия:** 1.0
