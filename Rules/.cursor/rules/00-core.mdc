@@ -254,6 +254,7 @@ docs/
 - `04-react-nextjs.mdc` — React и Next.js
 - `09-figma-design.mdc` — дизайн и Figma
 - `16-state-management.mdc` — управление состоянием
+- `20-i18n.mdc` — интернационализация (i18n)
 
 ### Backend
 - `05-backend-nestjs.mdc` — NestJS и backend

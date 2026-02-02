@@ -579,6 +579,156 @@ volumes:
 
 ---
 
+## 🚩 FEATURE FLAGS
+
+### Зачем нужны
+
+- Постепенный rollout новых фич
+- A/B тестирование
+- Kill switch для проблемных фич
+- Разделение deploy и release
+
+### Простая реализация
+
+```typescript
+// lib/feature-flags.ts
+
+type FeatureFlag = {
+  enabled: boolean;
+  percentage?: number;  // Для постепенного rollout
+  allowedUsers?: string[];  // Для beta-тестеров
+};
+
+const FLAGS: Record<string, FeatureFlag> = {
+  'new-checkout': {
+    enabled: true,
+    percentage: 10,  // 10% пользователей
+  },
+  'dark-mode': {
+    enabled: true,
+    allowedUsers: ['user-123', 'user-456'],
+  },
+  'experimental-search': {
+    enabled: false,
+  },
+};
+
+export function isFeatureEnabled(
+  flagName: string,
+  userId?: string,
+): boolean {
+  const flag = FLAGS[flagName];
+  if (!flag || !flag.enabled) return false;
+
+  // Проверяем список разрешённых
+  if (flag.allowedUsers?.includes(userId ?? '')) {
+    return true;
+  }
+
+  // Проверяем процент
+  if (flag.percentage !== undefined && userId) {
+    const hash = simpleHash(userId + flagName);
+    return (hash % 100) < flag.percentage;
+  }
+
+  return flag.enabled;
+}
+
+function simpleHash(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+}
+```
+
+### Использование
+
+```tsx
+// В React компоненте
+function CheckoutPage() {
+  const { user } = useAuth();
+  const showNewCheckout = isFeatureEnabled('new-checkout', user?.id);
+
+  if (showNewCheckout) {
+    return <NewCheckout />;
+  }
+  return <OldCheckout />;
+}
+
+// В API
+@Get('search')
+async search(@Query() query: SearchDto, @CurrentUser() user: User) {
+  if (isFeatureEnabled('experimental-search', user?.id)) {
+    return this.experimentalSearch(query);
+  }
+  return this.classicSearch(query);
+}
+```
+
+### Продвинутые решения
+
+```markdown
+## Сервисы Feature Flags
+
+| Сервис | Плюсы | Минусы |
+|--------|-------|--------|
+| LaunchDarkly | Мощный, A/B, analytics | Дорого |
+| Unleash | Open source, self-hosted | Нужно хостить |
+| ConfigCat | Простой, дешёвый | Меньше фич |
+| Flagsmith | Open source, хороший UI | Молодой |
+| Env vars | Бесплатно, просто | Требует redeploy |
+```
+
+### Environment-based Flags
+
+```typescript
+// Простой вариант через env
+const FEATURES = {
+  NEW_CHECKOUT: process.env.FEATURE_NEW_CHECKOUT === 'true',
+  DARK_MODE: process.env.FEATURE_DARK_MODE === 'true',
+};
+
+// .env.staging
+FEATURE_NEW_CHECKOUT=true
+FEATURE_DARK_MODE=true
+
+// .env.production
+FEATURE_NEW_CHECKOUT=false
+FEATURE_DARK_MODE=true
+```
+
+### Правила Feature Flags
+
+```markdown
+## Best Practices
+
+### Именование
+- ✅ `new-checkout`, `experimental-search`
+- ❌ `flag1`, `test`, `temp`
+
+### Lifecycle
+1. Создать флаг (disabled)
+2. Включить для dev/staging
+3. Постепенный rollout в prod (10% → 50% → 100%)
+4. Удалить флаг и старый код
+
+### Гигиена
+- ✅ Удалять флаги после полного rollout
+- ✅ Документировать назначение каждого флага
+- ✅ Устанавливать expiration date
+- ❌ Не накапливать сотни флагов
+
+### Мониторинг
+- ✅ Логировать какой вариант показан
+- ✅ Метрики по каждому варианту
+- ✅ Алерты при проблемах с новым вариантом
+```
+
+---
+
 ## 📋 CHECKLIST
 
 ### CI Pipeline
@@ -606,7 +756,14 @@ volumes:
 - [ ] Health checks
 - [ ] .dockerignore настроен
 
+### Feature Flags (если используются)
+
+- [ ] Флаги документированы
+- [ ] Есть kill switch для критичных фич
+- [ ] Старые флаги удаляются
+- [ ] Логирование какой вариант показан
+
 ---
 
-**Версия:** 1.0
+**Версия:** 1.1
 **Дата:** 2025-01-31

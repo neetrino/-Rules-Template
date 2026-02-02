@@ -468,6 +468,162 @@ app.use(compression());
 
 ---
 
+## 🔔 WEBHOOKS
+
+### Отправка webhooks
+
+```typescript
+// services/webhook.service.ts
+@Injectable()
+export class WebhookService {
+  private readonly logger = new Logger(WebhookService.name);
+
+  async send(
+    url: string,
+    event: string,
+    payload: unknown,
+    secret: string,
+  ): Promise<void> {
+    const timestamp = Date.now();
+    const body = JSON.stringify({
+      event,
+      timestamp,
+      data: payload,
+    });
+
+    // Подпись для верификации
+    const signature = this.createSignature(body, secret, timestamp);
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Webhook-Signature': signature,
+          'X-Webhook-Timestamp': timestamp.toString(),
+          'X-Webhook-Event': event,
+        },
+        body,
+        signal: AbortSignal.timeout(10000), // 10s timeout
+      });
+
+      if (!response.ok) {
+        throw new Error(`Webhook failed: ${response.status}`);
+      }
+
+      this.logger.log(`Webhook sent: ${event} to ${url}`);
+    } catch (error) {
+      this.logger.error(`Webhook failed: ${event} to ${url}`, error);
+      // Поставить в очередь для retry
+      await this.queueRetry(url, event, payload, secret);
+    }
+  }
+
+  private createSignature(
+    body: string,
+    secret: string,
+    timestamp: number,
+  ): string {
+    const payload = `${timestamp}.${body}`;
+    return crypto
+      .createHmac('sha256', secret)
+      .update(payload)
+      .digest('hex');
+  }
+
+  private async queueRetry(...args: unknown[]) {
+    // Добавить в BullMQ для повторной отправки
+  }
+}
+```
+
+### Приём webhooks
+
+```typescript
+// controllers/webhook.controller.ts
+@Controller('webhooks')
+export class WebhookController {
+  
+  @Post('stripe')
+  async handleStripe(
+    @Body() body: unknown,
+    @Headers('stripe-signature') signature: string,
+  ) {
+    // Верификация подписи
+    const event = this.verifyStripeSignature(body, signature);
+    
+    // Идемпотентность — проверяем что не обрабатывали
+    const processed = await this.cache.get(`webhook:${event.id}`);
+    if (processed) {
+      return { received: true, duplicate: true };
+    }
+    
+    // Обрабатываем
+    await this.processEvent(event);
+    
+    // Помечаем как обработанный
+    await this.cache.set(`webhook:${event.id}`, true, 86400 * 7); // 7 дней
+    
+    return { received: true };
+  }
+}
+```
+
+### Правила Webhooks
+
+```markdown
+## При отправке webhooks
+
+### Подпись
+- ✅ HMAC-SHA256 подпись в заголовке
+- ✅ Timestamp для защиты от replay attacks
+- ✅ Документировать формат подписи
+
+### Retry стратегия
+- ✅ Exponential backoff: 1m, 5m, 30m, 2h, 24h
+- ✅ Максимум 5-10 попыток
+- ✅ Логировать все попытки
+- ✅ Уведомлять при финальном отказе
+
+### Payload
+- ✅ Минимум данных (id + event type)
+- ✅ Получатель должен запросить детали по API
+- ✅ Не отправлять секретные данные
+
+## При приёме webhooks
+
+### Верификация
+- ✅ Проверять подпись
+- ✅ Проверять timestamp (не старше 5 минут)
+- ✅ Использовать HTTPS only
+
+### Идемпотентность
+- ✅ Сохранять ID обработанных событий
+- ✅ При повторе — возвращать 200, но не обрабатывать
+- ✅ Хранить ID минимум 7 дней
+
+### Обработка
+- ✅ Быстро вернуть 200 (< 3 секунд)
+- ✅ Тяжёлую обработку — в очередь
+- ✅ Логировать все входящие события
+```
+
+### Формат Webhook события
+
+```json
+{
+  "id": "evt_123abc",
+  "event": "order.completed",
+  "timestamp": 1705312800000,
+  "data": {
+    "orderId": "ord_456def",
+    "status": "completed"
+  }
+}
+```
+
+---
+
 ## 📋 CHECKLIST
 
 ### Новый endpoint
@@ -489,7 +645,15 @@ app.use(compression());
 - [ ] Пагинация для списков
 - [ ] Логирование
 
+### Webhooks (если используются)
+
+- [ ] Подпись реализована (HMAC-SHA256)
+- [ ] Retry с exponential backoff
+- [ ] Идемпотентность при приёме
+- [ ] Timestamp проверяется
+- [ ] Документация для получателей
+
 ---
 
-**Версия:** 1.0
+**Версия:** 1.1
 **Дата:** 2025-01-31
