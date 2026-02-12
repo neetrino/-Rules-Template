@@ -295,7 +295,7 @@ jobs:
       # Database migrations
       - name: Run migrations
         run: |
-          npx prisma migrate deploy
+          pnpm prisma migrate deploy
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
@@ -816,7 +816,7 @@ FEATURE_DARK_MODE=true
 builder = "nixpacks"
 
 [deploy]
-startCommand = "npm run start:prod"
+startCommand = "pnpm start:prod"
 healthcheckPath = "/health"
 healthcheckTimeout = 30
 restartPolicyType = "on_failure"
@@ -966,7 +966,7 @@ primary_region = "iad"
 ## Railway
 
 # В настройках Deploy Command:
-npx prisma migrate deploy && npm run start:prod
+pnpm prisma migrate deploy && pnpm start:prod
 
 ## Или через GitHub Actions (рекомендуется для production)
 

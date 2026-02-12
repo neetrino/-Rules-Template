@@ -414,13 +414,13 @@ slug  String @unique
 # 1. Изменить schema.prisma
 
 # 2. Создать миграцию (development)
-npx prisma migrate dev --name add_user_role
+pnpm prisma migrate dev --name add_user_role
 
 # 3. Применить миграцию (production)
-npx prisma migrate deploy
+pnpm prisma migrate deploy
 
 # 4. Сгенерировать клиент
-npx prisma generate
+pnpm prisma generate
 ```
 
 ### Именование миграций

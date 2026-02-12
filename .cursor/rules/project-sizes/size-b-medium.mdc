@@ -227,8 +227,13 @@ import { z } from 'zod';
 
 const envSchema = z.object({
   DATABASE_URL: z.string().url(),
-  NEXTAUTH_SECRET: z.string().min(32),
-  NEXTAUTH_URL: z.string().url(),
+  DIRECT_URL: z.string().url(),
+  AUTH_SECRET: z.string().min(32),
+  AUTH_URL: z.string().url(),
+  R2_ACCOUNT_ID: z.string().min(1),
+  R2_ACCESS_KEY_ID: z.string().min(1),
+  R2_SECRET_ACCESS_KEY: z.string().min(1),
+  R2_BUCKET_NAME: z.string().min(1),
   // ...
 });
 
@@ -306,5 +311,5 @@ export const env = envSchema.parse(process.env);
 
 ---
 
-**Версия:** 1.0
-**Дата:** 2025-01-31
+**Версия:** 1.1
+**Дата:** 2026-02-12

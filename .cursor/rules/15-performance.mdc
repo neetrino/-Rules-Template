@@ -146,7 +146,7 @@ export { Input } from './Input';
 
 ```bash
 # Установка
-npm install @next/bundle-analyzer
+pnpm add @next/bundle-analyzer
 
 # next.config.js
 const withBundleAnalyzer = require('@next/bundle-analyzer')({
@@ -158,7 +158,7 @@ module.exports = withBundleAnalyzer({
 });
 
 # Запуск
-ANALYZE=true npm run build
+ANALYZE=true pnpm build
 ```
 
 ### Tree Shaking
@@ -529,4 +529,4 @@ export function reportWebVitals(metric: any) {
 ---
 
 **Версия:** 1.0
-**Дата:** 2025-01-31
+**Дата:** 2026-02-12
