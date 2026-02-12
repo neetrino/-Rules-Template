@@ -21,6 +21,8 @@
 | 1.4 | Node.js | 20.x LTS | |
 | 1.5 | TypeScript | 5.x, strict: true | |
 | 1.6 | Monorepo tool | — / Turborepo | только для C |
+| 1.7 | Git стратегия | trunk-based / feature branches | |
+| 1.8 | Commit convention | Conventional Commits | стандарт |
 
 ---
 
@@ -36,6 +38,9 @@
 | 2.6 | Data fetching | Server Components / React Query 5.x | |
 | 2.7 | i18n | не нужно / next-intl (языки: ...) | |
 | 2.8 | SEO | Metadata API + JSON-LD / не нужно | |
+| 2.9 | Тёмная тема | не нужно / CSS variables + next-themes | решить до UI |
+| 2.10 | Анимации | не нужно / Framer Motion / CSS transitions | |
+| 2.11 | PWA | не нужно / next-pwa | service worker, manifest |
 
 ---
 
@@ -48,6 +53,8 @@
 | 3.3 | API формат | REST / GraphQL | |
 | 3.4 | Rate limiting | middleware / ThrottlerModule / не нужно | |
 | 3.5 | Документация API | не нужно / Swagger | |
+| 3.6 | CRON / задачи по расписанию | не нужно / Vercel Cron / node-cron | влияет на выбор хостинга |
+| 3.7 | Загрузка файлов | не нужно / Multer / Server Actions → R2 | |
 
 ---
 
@@ -60,8 +67,11 @@
 | 4.3 | Роли БД | app_user + readonly_user | стандарт |
 | 4.4 | Connection limit | [адаптивное — обсудить] | |
 | 4.5 | statement_timeout | [адаптивное — обсудить] | |
-| 4.6 | Кэш (Redis) | не нужно / Upstash Redis | |
-| 4.7 | Очереди | не нужно / BullMQ + Redis | |
+| 4.6 | idle_in_transaction_session_timeout | [адаптивное — обсудить] | |
+| 4.7 | lock_timeout | [адаптивное — обсудить] | |
+| 4.8 | Seed data | не нужно / prisma db seed | для dev/test |
+| 4.9 | Кэш (Redis) | не нужно / Upstash Redis | |
+| 4.10 | Очереди | не нужно / BullMQ + Redis | |
 
 ---
 
@@ -73,6 +83,8 @@
 | 5.2 | Провайдеры | GitHub, Google, Email... | |
 | 5.3 | Стратегия сессий | JWT / Database sessions | |
 | 5.4 | Роли / RBAC | не нужно / USER, ADMIN, ... | |
+| 5.5 | Email верификация | не нужна / нужна | влияет на email-сервис |
+| 5.6 | Сброс пароля | не нужен / нужен | если Credentials provider |
 
 ---
 
@@ -97,6 +109,9 @@
 | 7.5 | Поиск | не нужно / Algolia / Meilisearch | |
 | 7.6 | Push / WebSocket | не нужно / Pusher / Ably | |
 | 7.7 | SMS | не нужно / Twilio | |
+| 7.8 | AI сервисы | не нужно / OpenAI / Vercel AI SDK | |
+| 7.9 | CMS | не нужно / Sanity / Strapi / Payload | если контент-проект |
+| 7.10 | Карты | не нужно / Google Maps / Mapbox | |
 
 ---
 
@@ -111,6 +126,9 @@
 | 8.5 | WAF | не нужно / Cloudflare | |
 | 8.6 | Мониторинг | не нужно / Sentry / Prometheus | |
 | 8.7 | Логирование | console (dev) / Pino (prod) | |
+| 8.8 | Окружения | только prod / dev + prod / dev + staging + prod | Neon branches, Vercel env |
+| 8.9 | Домен | Vercel авто / кастомный домен | влияет на CORS, AUTH_URL |
+| 8.10 | Бэкапы БД | Neon auto (PITR) / дополнительные | |
 
 ---
 
@@ -119,9 +137,10 @@
 | # | Параметр | Решение | Примечание |
 |---|----------|---------|------------|
 | 9.1 | Unit тесты | Vitest | |
-| 9.2 | E2E тесты | не нужно / Playwright / Cypress | |
-| 9.3 | Покрытие (цель) | [адаптивное — обсудить] | рекомендация ≥70% |
-| 9.4 | API тесты | не нужно / supertest | |
+| 9.2 | Компонентные тесты | не нужно / React Testing Library / Storybook | |
+| 9.3 | E2E тесты | не нужно / Playwright / Cypress | |
+| 9.4 | Покрытие (цель) | [адаптивное — обсудить] | рекомендация ≥70% |
+| 9.5 | API тесты | не нужно / supertest | |
 
 ---
 
