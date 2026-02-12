@@ -86,16 +86,16 @@ alwaysApply: false
 - [ ] Транзакции для связанных операций
 - [ ] Soft delete для важных данных
 - [ ] Пагинация для списков
-- [ ] **Роли и лимиты (все проекты):**
+- [ ] **Роли и лимиты (все проекты):** *(подробности: 06-database.mdc)*
   - [ ] `app_user` создан с DML-only правами
   - [ ] `DATABASE_URL` использует `app_user` (не owner)
   - [ ] `DIRECT_URL` использует owner (только миграции)
-  - [ ] `statement_timeout` установлен *(значение адаптивное)*
+  - [ ] `statement_timeout` установлен *(адаптивное, диапазон в 06-database)*
   - [ ] `idle_in_transaction_session_timeout` установлен
   - [ ] `lock_timeout` установлен
 - [ ] **Роли и лимиты (Size B/C):**
   - [ ] `readonly_user` создан (аналитика/поддержка)
-  - [ ] `CONNECTION LIMIT` для long-running backend *(значение адаптивное)*
+  - [ ] `CONNECTION LIMIT` для long-running backend *(адаптивное, диапазон в 06-database)*
 - [ ] **Если Neon:**
   - [ ] Connection pooling включён
   - [ ] `directUrl` для миграций
@@ -607,4 +607,4 @@ alwaysApply: false
 ---
 
 **Версия:** 2.1
-**Дата:** 2025-02-12
+**Дата:** 2026-02-12

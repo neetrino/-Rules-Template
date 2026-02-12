@@ -578,8 +578,11 @@ export const metadata: Metadata = {
 // app/products/[id]/page.tsx
 import type { Metadata } from 'next';
 
+type Props = { params: Promise<{ id: string }> };
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const product = await getProduct(params.id);
+  const { id } = await params;
+  const product = await getProduct(id);
 
   return {
     title: product.name,
@@ -663,4 +666,4 @@ export default function robots(): MetadataRoute.Robots {
 ---
 
 **Версия:** 1.1
-**Дата:** 2025-02-12
+**Дата:** 2026-02-12

@@ -172,8 +172,10 @@ export function middleware(req: NextRequest) {
   const response = NextResponse.next();
   response.headers.set('x-request-id', requestId);
 
-  // Для serverless — логируем в stdout (Vercel Logs подхватит)
-  console.log(JSON.stringify({
+  // Structured log для Vercel Logs / любой log collector
+  // В Edge Runtime (middleware) pino не работает, используем structuredClone + stdout
+  const log = {
+    level: 'info',
     event: 'request',
     requestId,
     method: req.method,
@@ -181,7 +183,9 @@ export function middleware(req: NextRequest) {
     userAgent: req.headers.get('user-agent'),
     ip: req.headers.get('x-forwarded-for'),
     timestamp: new Date().toISOString(),
-  }));
+  };
+  // eslint-disable-next-line no-console -- Edge Runtime, pino недоступен
+  console.info(JSON.stringify(log));
 
   return response;
 }
@@ -243,6 +247,14 @@ export function requestLogger(
   req.headers['x-request-id'] = requestId;
   res.setHeader('x-request-id', requestId);
 
+  // Типизация расширенного Request
+  interface AuthenticatedRequest extends Request {
+    user?: { id: string };
+    logger?: ReturnType<typeof logger.child>;
+  }
+
+  const authReq = req as AuthenticatedRequest;
+
   // Создаём logger с контекстом запроса
   const reqLogger = logger.child({
     requestId,
@@ -250,7 +262,7 @@ export function requestLogger(
     path: req.path,
     userAgent: req.headers['user-agent'],
     ip: req.ip,
-    userId: (req as any).user?.id,
+    userId: authReq.user?.id,
   });
 
   // Время начала
@@ -272,7 +284,7 @@ export function requestLogger(
   });
 
   // Добавляем logger в request для использования в handlers
-  (req as any).logger = reqLogger;
+  authReq.logger = reqLogger;
 
   next();
 }
@@ -361,6 +373,7 @@ export class OrdersService {
 
 ```typescript
 // metrics/app.metrics.ts
+import { Counter, Histogram, Gauge, Summary } from 'prom-client';
 
 // HTTP метрики
 export const httpMetrics = {
@@ -472,14 +485,20 @@ export function middleware(req: NextRequest) {
 // const correlationId = req.headers.get('x-correlation-id');
 
 // === NestJS/Express — middleware/correlation.ts ===
+import { AsyncLocalStorage } from 'async_hooks';
+import { v4 as uuid } from 'uuid';
+import { Request, Response, NextFunction } from 'express';
+
+const correlationStorage = new AsyncLocalStorage<{ correlationId: string }>();
+
 export function correlationMiddleware(
   req: Request,
   res: Response,
   next: NextFunction,
 ) {
   const correlationId = 
-    req.headers['x-correlation-id'] as string ||
-    req.headers['x-request-id'] as string ||
+    (req.headers['x-correlation-id'] as string) ??
+    (req.headers['x-request-id'] as string) ??
     uuid();
 
   req.headers['x-correlation-id'] = correlationId;
@@ -659,4 +678,4 @@ logger.debug('Entering function X'); // ❌ Слишком шумно
 ---
 
 **Версия:** 1.1
-**Дата:** 2025-02-12
+**Дата:** 2026-02-12

@@ -41,11 +41,11 @@ export function middleware(request: NextRequest) {
   if (pathnameHasLocale) return;
 
   // Определяем locale из Accept-Language header
-  const locale = request.headers.get('accept-language')?.split(',')[0]?.split('-')[0] || defaultLocale;
+  const locale = request.headers.get('accept-language')?.split(',')[0]?.split('-')[0] ?? defaultLocale;
   const resolvedLocale = locales.includes(locale) ? locale : defaultLocale;
 
-  request.nextUrl.pathname = `/${resolvedLocale}${pathname}`;
-  return NextResponse.redirect(request.nextUrl);
+  const url = new URL(`/${resolvedLocale}${pathname}`, request.url);
+  return NextResponse.redirect(url);
 }
 
 export const config = {
@@ -474,4 +474,4 @@ formatCurrency(amount, currency, locale)
 ---
 
 **Версия:** 1.1
-**Дата:** 2025-02-12
+**Дата:** 2026-02-12
