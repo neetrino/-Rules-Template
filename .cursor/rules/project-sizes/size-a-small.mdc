@@ -88,25 +88,27 @@ project/
 
 \`\`\`bash
 # Установка
-npm install
+pnpm install
 
 # Настройка
 cp .env.example .env
 # Заполни .env
 
 # База данных
-npx prisma migrate dev
+pnpm prisma migrate dev
 
 # Запуск
-npm run dev
+pnpm dev
 \`\`\`
 
 ## Технологии
 
-- Next.js 14
+- Next.js 15
 - TypeScript
-- Tailwind CSS
-- Prisma + PostgreSQL
+- Tailwind CSS 4
+- Prisma 6 + PostgreSQL (Neon)
+- Auth.js 5
+- Cloudflare R2
 
 ## Структура
 
@@ -120,9 +122,9 @@ src/
 
 ## Скрипты
 
-- `npm run dev` — разработка
-- `npm run build` — сборка
-- `npm run lint` — проверка
+- `pnpm dev` — разработка
+- `pnpm build` — сборка
+- `pnpm lint` — проверка
 ```
 
 ---
@@ -193,5 +195,5 @@ src/
 
 ---
 
-**Версия:** 1.0
-**Дата:** 2025-01-31
+**Версия:** 1.1
+**Дата:** 2026-02-12

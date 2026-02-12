@@ -165,7 +165,7 @@ export default async function Page({ params }: { params: { locale: Locale } }) {
 ### Client Components (next-intl)
 
 ```typescript
-// Установка: npm install next-intl
+// Установка: pnpm add next-intl
 
 // lib/i18n/config.ts
 import { getRequestConfig } from 'next-intl/server';
