@@ -253,6 +253,13 @@ describe('ProductsController (e2e)', () => {
     });
   });
   
+  // Создаём тестовый JWT токен
+  const adminToken = jwt.sign(
+    { userId: 'test-admin', role: 'admin' },
+    process.env.JWT_SECRET!,
+    { expiresIn: '1h' },
+  );
+
   describe('POST /products', () => {
     it('should create product', async () => {
       const dto = {
@@ -323,7 +330,7 @@ describe('useProducts', () => {
   
   it('should handle error', async () => {
     const error = new Error('Failed to fetch');
-    (fetchProducts as jest.Mock).mockRejectedValue(error);
+    (fetchProducts as ReturnType<typeof vi.fn>).mockRejectedValue(error);
     
     const { result } = renderHook(() => useProducts());
     
@@ -557,4 +564,4 @@ tests/
 ---
 
 **Версия:** 1.1
-**Дата:** 2025-02-12
+**Дата:** 2026-02-12

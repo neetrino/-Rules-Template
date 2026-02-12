@@ -253,7 +253,13 @@ export async function POST(req: NextRequest) {
   const parsed = createProductSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: { code: 'VALIDATION_ERROR', details: parsed.error.flatten() } },
+      {
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Ошибка валидации входных данных',
+          details: parsed.error.flatten().fieldErrors,
+        },
+      },
       { status: 422 },
     );
   }
@@ -754,4 +760,4 @@ export class WebhookController {
 ---
 
 **Версия:** 1.2
-**Дата:** 2025-02-12
+**Дата:** 2026-02-12
