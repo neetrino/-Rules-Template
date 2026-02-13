@@ -115,7 +115,7 @@ if (isUser(data)) {
 }
 
 // ✅ Եթե assertion անհրաժեշտ է — ավելացրու՛ մեկնաբանություն-հիմնավորում
-// Type assertion безопасен: getElementById гарантированно вернёт div
+// Type assertion-ը անվտանգ է — getElementById-ն այս էջում միշտ div է վերադարձնում
 const element = document.getElementById('app') as HTMLDivElement;
 ```
 

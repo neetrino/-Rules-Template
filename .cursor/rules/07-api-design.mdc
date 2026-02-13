@@ -19,64 +19,64 @@ alwaysApply: false
 
 ---
 
-## 🔗 URL СТРУКТУРА
+## 🔗 URL ԿԱՌՈՒՑՎԱԾՔ
 
-### Правила именования
+### Անվանավորման կանոններ
 
 ```
-✅ ПРАВИЛЬНО:
-GET    /api/v1/products          # Список
-GET    /api/v1/products/:id      # Один элемент
-POST   /api/v1/products          # Создать
-PUT    /api/v1/products/:id      # Обновить полностью
-PATCH  /api/v1/products/:id      # Обновить частично
-DELETE /api/v1/products/:id      # Удалить
+✅ ՃԻՇՏ:
+GET    /api/v1/products          # Ցանկ
+GET    /api/v1/products/:id      # Մեկ տարր
+POST   /api/v1/products          # Ստեղծել
+PUT    /api/v1/products/:id      # Թարմացնել ամբողջությամբ
+PATCH  /api/v1/products/:id      # Թարմացնել մասնակի
+DELETE /api/v1/products/:id      # Ջնջել
 
-# Вложенные ресурсы
+# Ներդրված ռեսուրսներ
 GET    /api/v1/orders/:orderId/items
 POST   /api/v1/orders/:orderId/items
 
-# Действия (когда не CRUD)
+# Գործողություններ (երբ CRUD չէ)
 POST   /api/v1/orders/:id/cancel
 POST   /api/v1/orders/:id/refund
 POST   /api/v1/auth/login
 POST   /api/v1/auth/logout
 
-❌ НЕПРАВИЛЬНО:
-GET    /api/v1/getProducts       # Глагол в URL
-POST   /api/v1/createProduct     # Глагол в URL
-GET    /api/v1/product           # Единственное число
-DELETE /api/v1/products/delete/1 # Лишний сегмент
+❌ ՍԽԱԼ:
+GET    /api/v1/getProducts       # Բայ URL-ում
+POST   /api/v1/createProduct     # Բայ URL-ում
+GET    /api/v1/product           # Եզակի թիվ
+DELETE /api/v1/products/delete/1 # Ավելորդ սեգմենտ
 ```
 
-### Query параметры
+### Query պարամետրեր
 
 ```
-# Пагинация
+# Էջավորում
 GET /api/v1/products?page=1&limit=20
 
-# Сортировка
+# Դասավորում
 GET /api/v1/products?sort=price&order=asc
-GET /api/v1/products?sort=-createdAt  # Минус = DESC
+GET /api/v1/products?sort=-createdAt  # Մինուս = DESC
 
-# Фильтрация
+# Ֆիլտրացում
 GET /api/v1/products?category=electronics&minPrice=1000&maxPrice=5000
 
-# Поиск
+# Որոնում
 GET /api/v1/products?search=iphone
 
-# Включение связей
+# Կապերի ներառում
 GET /api/v1/products?include=category,variants
 
-# Выбор полей
+# Դաշտերի ընտրություն
 GET /api/v1/products?fields=id,name,price
 ```
 
 ---
 
-## 📤 ФОРМАТ ОТВЕТА
+## 📤 ՊԱՏԱՍԽԱՆԻ ՖՈՐՄԱՏ
 
-### Успешный ответ (единичный объект)
+### Հաջող պատասխան (մեկ օբյեկտ)
 
 ```json
 {
@@ -86,7 +86,7 @@ GET /api/v1/products?fields=id,name,price
     "price": 99900,
     "category": {
       "id": "clx456def",
-      "name": "Смартфоны"
+      "name": "Սմարթֆոններ"
     },
     "createdAt": "2024-01-15T10:30:00Z",
     "updatedAt": "2024-01-15T10:30:00Z"

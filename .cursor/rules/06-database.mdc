@@ -34,9 +34,9 @@ alwaysApply: false
 
 ```
 Production:
-├── PostgreSQL 15+ — основная БД
-├── Redis 7+ — кэш и очереди
-└── (опционально) Elasticsearch — полнотекстовый поиск
+├── PostgreSQL 15+ — հիմնական ԲԴ
+├── Redis 7+ — cache և հերթեր
+└── (ընտրովի) Elasticsearch — ամբողջատեքստ որոնում
 ```
 
 ---
@@ -72,7 +72,7 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   
-  // Կապեր
+  // Կապեր (relations)
   orders    Order[]
   sessions  Session[]
   
@@ -117,7 +117,7 @@ model Category {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   
-  // Связи
+  // Կապեր
   parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
   children Category[] @relation("CategoryTree")
   products Product[]
@@ -224,7 +224,7 @@ model Order {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
   
-  // Связи
+  // Կապեր
   user        User?       @relation(fields: [userId], references: [id])
   items       OrderItem[]
   payments    Payment[]

@@ -1,6 +1,6 @@
 # Neon — Ամբողջական կարգավորում
 
-> Neon — serverless PostgreSQL branching, autoscaling և ավտոմատ բэкаպներով։
+> Neon — serverless PostgreSQL branching, autoscaling և ավտոմատ բեքափներով։
 
 ---
 
@@ -264,7 +264,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 ## 7. Backup & Restore {#backup-restore}
 
-### Ավտոմատ բэкаպներ.
+### Ավտոմատ բեքափներ.
 
 Neon-ը ավտոմատ պահպանում է փոփոխությունների պատմությունը.
 
