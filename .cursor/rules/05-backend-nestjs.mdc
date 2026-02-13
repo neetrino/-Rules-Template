@@ -1,27 +1,27 @@
 ---
-description: Правила Backend и NestJS. Применяется к серверному коду и API.
+description: Backend և NestJS-ի կանոններ։ Կիրառվում է սերվերային կոդին և API-ին։
 globs: ["**/api/**", "**/server/**", "**/backend/**", "**/*.service.ts", "**/*.controller.ts", "**/*.module.ts"]
 alwaysApply: false
 ---
 
-# ПРАВИЛА BACKEND И NESTJS
+# BACKEND ԵՎ NESTJS-Ի ԿԱՆՈՆՆԵՐ
 
-> Чистая архитектура, тонкие контроллеры, толстые сервисы.
-
----
-
-## 🎯 ГЛАВНЫЕ ПРИНЦИПЫ
-
-1. **Контроллеры тонкие** — только роутинг и валидация
-2. **Сервисы содержат логику** — вся бизнес-логика здесь
-3. **Dependency Injection** — всё через конструктор
-4. **DTO для всех данных** — валидация на входе
+> Մաքուր ճարտարապետություն, բարակ կոնտրոլերներ, հաստ սերվիսներ։
 
 ---
 
-## 📁 СТРУКТУРА МОДУЛЯ
+## 🎯 ՀԻՄՆԱԿԱՆ ՍԿԶԲՈՒՆՔՆԵՐ
 
-### Стандартная структура NestJS модуля
+1. **Կոնտրոլերները բարակ** — միայն ռուտինգ և վալիդացիա
+2. **Սերվիսներում է լոգիկան** — ամբողջ բիզնես-լոգիկան այստեղ
+3. **Dependency Injection** — ամեն ինչ կոնստրուկտորի միջոցով
+4. **DTO բոլոր տվյալների համար** — վալիդացիա մուտքի կետում
+
+---
+
+## 📁 ՄՈԴՈՒԼԻ ԿԱՌՈՒՑՎԱԾՔ
+
+### NestJS մոդուլի ստանդարտ կառուցվածք
 
 ```
 src/
@@ -65,19 +65,19 @@ src/
 
 ---
 
-## 🎮 КОНТРОЛЛЕРЫ
+## 🎮 ԿՈՆՏՐՈԼԵՐՆԵՐ
 
-### Тонкий контроллер (правильно)
+### Բարակ կոնտրոլեր (ճիշտ)
 
 ```typescript
-// ✅ ПРАВИЛЬНО — контроллер только для роутинга
+// ✅ ՃԻՇՏ — կոնտրոլեր միայն ռուտինգի համար
 @Controller('products')
 @ApiTags('products')
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Получить список продуктов' })
+  @ApiOperation({ summary: 'Ստանալ ապրանքների ցանկ' })
   async findAll(
     @Query() query: ProductQueryDto
   ): Promise<PaginatedResponse<Product>> {
@@ -85,7 +85,7 @@ export class ProductsController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Получить продукт по ID' })
+  @ApiOperation({ summary: 'Ստանալ ապրանք ID-ով' })
   async findOne(
     @Param('id', ParseUUIDPipe) id: string
   ): Promise<Product> {
@@ -95,7 +95,7 @@ export class ProductsController {
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
-  @ApiOperation({ summary: 'Создать продукт' })
+  @ApiOperation({ summary: 'Ստեղծել ապրանք' })
   async create(
     @Body() dto: CreateProductDto,
     @CurrentUser() user: User
@@ -125,28 +125,28 @@ export class ProductsController {
 }
 ```
 
-### Толстый контроллер (неправильно)
+### Հաստ կոնտրոլեր (սխալ)
 
 ```typescript
-// ❌ НЕПРАВИЛЬНО — логика в контроллере
+// ❌ ՍԽԱԼ — լոգիկա կոնտրոլերում
 @Controller('products')
 export class ProductsController {
   constructor(private readonly prisma: PrismaService) {}
 
   @Get()
   async findAll(@Query() query: any) {
-    // ❌ Прямой доступ к БД
+    // ❌ Ուղղակի ԲԴ-ի մուտք
     const products = await this.prisma.product.findMany({
       where: {
         isActive: true,
         category: query.category,
       },
-      // ❌ Логика пагинации в контроллере
+      // ❌ Պագինացիայի լոգիկա կոնտրոլերում
       skip: (query.page - 1) * query.limit,
       take: query.limit,
     });
     
-    // ❌ Трансформация данных в контроллере
+    // ❌ Տվյալների տրանսֆորմացիա կոնտրոլերում
     return products.map(p => ({
       ...p,
       priceFormatted: `${p.price} ₽`,
@@ -157,9 +157,9 @@ export class ProductsController {
 
 ---
 
-## ⚙️ СЕРВИСЫ
+## ⚙️ ՍԵՐՎԻՍՆԵՐ
 
-### Структура сервиса
+### Սերվիսի կառուցվածք
 
 ```typescript
 @Injectable()
@@ -173,7 +173,7 @@ export class ProductsService {
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
-  // Публичные методы — бизнес-операции
+  // Հրապարակային մեթոդներ — բիզնես-օպերացիաներ
   async findAll(query: ProductQueryDto): Promise<PaginatedResponse<Product>> {
     const { page = 1, limit = 20, category, search } = query;
     
@@ -201,7 +201,7 @@ export class ProductsService {
   }
 
   async findOne(id: string): Promise<Product> {
-    // Сначала проверяем кэш
+    // Նախ ստուգում ենք cache-ը
     const cached = await this.cacheService.get<Product>(`product:${id}`);
     if (cached) return cached;
 
@@ -214,14 +214,14 @@ export class ProductsService {
       throw new NotFoundException(`Product with ID ${id} not found`);
     }
 
-    // Кэшируем
+    // Cache-ում
     await this.cacheService.set(`product:${id}`, product, 3600);
 
     return product;
   }
 
   async create(dto: CreateProductDto, user: User): Promise<Product> {
-    // Валидация бизнес-правил
+    // Բիզնես-կանոնների վալիդացիա
     await this.validateCategory(dto.categoryId);
     
     const product = await this.prisma.product.create({
@@ -231,10 +231,10 @@ export class ProductsService {
       },
     });
 
-    // Индексация для поиска
+    // Ինդեքսացիա որոնման համար
     await this.searchService.index('products', product);
     
-    // Событие
+    // Իվենտ
     this.eventEmitter.emit('product.created', { product, user });
     
     this.logger.log(`Product created: ${product.id} by user ${user.id}`);
@@ -243,17 +243,17 @@ export class ProductsService {
   }
 
   async update(id: string, dto: UpdateProductDto): Promise<Product> {
-    await this.findOne(id); // Проверяем что существует
+    await this.findOne(id); // Ստուգում ենք, որ գոյություն ունի
     
     const product = await this.prisma.product.update({
       where: { id },
       data: dto,
     });
 
-    // Инвалидируем кэш
+    // Cache-ի invalidation
     await this.cacheService.del(`product:${id}`);
     
-    // Обновляем индекс
+    // Թարմացնում ենք ինդեքսը
     await this.searchService.update('products', product);
     
     this.eventEmitter.emit('product.updated', { product });
@@ -272,7 +272,7 @@ export class ProductsService {
     this.eventEmitter.emit('product.deleted', { id });
   }
 
-  // Приватные методы — вспомогательная логика
+  // Private մեթոդներ — օժանդակ լոգիկա
   private buildWhereClause(query: ProductQueryDto): Prisma.ProductWhereInput {
     const where: Prisma.ProductWhereInput = {
       isActive: true,
@@ -314,7 +314,7 @@ export class ProductsService {
 
 ## 📝 DTO (Data Transfer Objects)
 
-### Правила DTO
+### DTO-ի կանոններ
 
 ```typescript
 // dto/create-product.dto.ts
@@ -322,23 +322,23 @@ import { IsString, IsNumber, IsOptional, IsUUID, Min, MaxLength } from 'class-va
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateProductDto {
-  @ApiProperty({ description: 'Название продукта', example: 'iPhone 15' })
+  @ApiProperty({ description: 'Ապրանքի անուն', example: 'iPhone 15' })
   @IsString()
   @MaxLength(255)
   name: string;
 
-  @ApiPropertyOptional({ description: 'Описание', example: 'Новый iPhone...' })
+  @ApiPropertyOptional({ description: 'Նկարագրություն', example: 'Նոր iPhone...' })
   @IsOptional()
   @IsString()
   @MaxLength(5000)
   description?: string;
 
-  @ApiProperty({ description: 'Цена в копейках', example: 99900 })
+  @ApiProperty({ description: 'Գին կոպեկներով', example: 99900 })
   @IsNumber()
   @Min(0)
   price: number;
 
-  @ApiProperty({ description: 'ID категории' })
+  @ApiProperty({ description: 'Կատեգորիայի ID' })
   @IsUUID()
   categoryId: string;
 
@@ -399,7 +399,7 @@ export class ProductQueryDto {
 
 ---
 
-## 🛡️ GUARDS И MIDDLEWARE
+## 🛡️ GUARDS ԵՎ MIDDLEWARE
 
 ### Auth Guard
 
@@ -440,7 +440,7 @@ export class RolesGuard implements CanActivate {
 }
 ```
 
-### Custom Decorators
+### Կաստոմ դեկորատորներ
 
 ```typescript
 // common/decorators/current-user.decorator.ts
@@ -455,7 +455,7 @@ export const CurrentUser = createParamDecorator(
 // common/decorators/roles.decorator.ts
 export const Roles = (...roles: string[]) => SetMetadata('roles', roles);
 
-// Использование
+// Օգտագործում
 @Get('profile')
 @UseGuards(JwtAuthGuard)
 getProfile(@CurrentUser() user: User) {
@@ -470,7 +470,7 @@ create(@Body() dto: CreateDto) { ... }
 
 ---
 
-## ⚠️ ОБРАБОТКА ОШИБОК
+## ⚠️ ՍԽԱԼՆԵՐԻ ՄՇԱԿՈՒՄ
 
 ### Exception Filter
 
@@ -539,7 +539,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
 }
 ```
 
-### Business Exceptions
+### Բիզնես Exceptions
 
 ```typescript
 // common/exceptions/business.exception.ts
@@ -562,7 +562,7 @@ export class InsufficientStockException extends BusinessException {
   }
 }
 
-// Использование
+// Օգտագործում
 if (variant.stock < quantity) {
   throw new InsufficientStockException(productId, quantity, variant.stock);
 }
@@ -570,10 +570,10 @@ if (variant.stock < quantity) {
 
 ---
 
-## 📊 ЛОГИРОВАНИЕ
+## 📊 ԼՈԳԱՎՈՐՈՒՄ
 
 ```typescript
-// Используй встроенный Logger
+// Օգտագործի՛ր ներկառուցված Logger
 @Injectable()
 export class OrdersService {
   private readonly logger = new Logger(OrdersService.name);
@@ -597,17 +597,17 @@ export class OrdersService {
 
 ## 📋 CHECKLIST
 
-### Модуль
+### Մոդուլ
 
-- [ ] Контроллер тонкий (только роутинг)
-- [ ] Сервис содержит бизнес-логику
-- [ ] DTO с валидацией
-- [ ] Swagger документация
-- [ ] Guards для защиты эндпоинтов
-- [ ] Обработка ошибок
-- [ ] Логирование важных операций
+- [ ] Կոնտրոլերը բարակ (միայն ռուտինգ)
+- [ ] Սերվիսը պարունակում է բիզնես-լոգիկա
+- [ ] DTO վալիդացիայով
+- [ ] Swagger փաստաթղթավորում
+- [ ] Guards էնդպոյնտների պաշտպանության համար
+- [ ] Սխալների մշակում
+- [ ] Կարևոր օպերացիաների լոգավորում
 
 ---
 
-**Версия:** 1.0
-**Дата:** 2026-02-12
+**Տարբերակ.** 1.0
+**Ամսաթիվ.** 2026-02-12

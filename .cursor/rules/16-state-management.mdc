@@ -1,10 +1,10 @@
 ---
-description: Правила управления состоянием. Server state, Client state, Form state, URL state.
+description: Վիճակի կառավարման կանոններ։ Server state, Client state, Form state, URL state։
 globs: ["**/*.tsx", "**/hooks/**", "**/store/**", "**/features/**"]
 alwaysApply: false
 ---
 
-# ПРАВИЛА УПРАВЛЕНИЯ СОСТОЯНИЕМ
+# ՎԻՃԱԿԻ ԿԱՌԱՎԱՐՄԱՆ ԿԱՆՈՆՆԵՐ
 
 > Правильное состояние в правильном месте. Не всё нужно хранить в глобальном сторе.
 

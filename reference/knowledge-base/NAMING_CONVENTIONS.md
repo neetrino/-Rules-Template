@@ -1,39 +1,39 @@
 # Naming Conventions
 
-> Этот файл — краткая шпаргалка. Полные правила — в `.cursor/rules/02-coding-standards.mdc`.
+> Այս ֆայլը — համառոտ օգնական։ Ամբողջական կանոնները — `.cursor/rules/02-coding-standards.mdc`-ում։
 
 ---
 
-## Файлы
+## Ֆայլեր
 
-| Тип | Формат | Пример |
+| Տիպ | Ձևաչափ | Օրինակ |
 |-----|--------|--------|
-| Компоненты React | PascalCase | `ProductCard.tsx` |
-| Хуки | camelCase + use | `useProducts.ts` |
-| Утилиты | camelCase | `formatPrice.ts` |
-| Типы | camelCase.types | `product.types.ts` |
-| Тесты | *.test.ts(x) | `formatPrice.test.ts` |
-| NestJS сервисы | kebab-case | `products.service.ts` |
+| React կոմպոնենտներ | PascalCase | `ProductCard.tsx` |
+| Հուկեր | camelCase + use | `useProducts.ts` |
+| Ուտիլիտաներ | camelCase | `formatPrice.ts` |
+| Տիպեր | camelCase.types | `product.types.ts` |
+| Թեստեր | *.test.ts(x) | `formatPrice.test.ts` |
+| NestJS սերվիսներ | kebab-case | `products.service.ts` |
 
-## Код
+## Կոդ
 
-| Тип | Формат | Пример |
+| Տիպ | Ձևաչափ | Օրինակ |
 |-----|--------|--------|
-| Переменные | camelCase | `userName` |
-| Функции | camelCase | `getProducts` |
-| Классы/Интерфейсы | PascalCase | `ProductService` |
-| Константы | UPPER_SNAKE | `API_BASE_URL` |
-| Enum значения | UPPER_SNAKE | `OrderStatus.PENDING` |
+| Փոփոխականներ | camelCase | `userName` |
+| Ֆունկցիաներ | camelCase | `getProducts` |
+| Դասեր/Ինտերֆեյսներ | PascalCase | `ProductService` |
+| Հաստատուններ | UPPER_SNAKE | `API_BASE_URL` |
+| Enum արժեքներ | UPPER_SNAKE | `OrderStatus.PENDING` |
 | Boolean | is/has/can | `isActive`, `hasAccess` |
 
-## БД (Prisma)
+## ԲԴ (Prisma)
 
-- Модели: PascalCase (`OrderItem`)
-- Поля: camelCase (`createdAt`)
-- Таблицы: snake_case через `@@map("order_items")`
+- Մոդելներ. PascalCase (`OrderItem`)
+- Դաշտեր. camelCase (`createdAt`)
+- Աղյուսակներ. snake_case `@@map("order_items")`-ով
 
 ---
 
-> Полные правила, примеры и антипаттерны: `.cursor/rules/02-coding-standards.mdc`
+> Ամբողջական կանոններ, օրինակներ և հակապաթեռններ. `.cursor/rules/02-coding-standards.mdc`
 
-**Последнее обновление:** 2026-02-12
+**Վերջին թարմացում.** 2026-02-12

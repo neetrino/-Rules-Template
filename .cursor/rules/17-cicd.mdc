@@ -1,10 +1,10 @@
 ---
-description: Правила CI/CD. GitHub Actions, пайплайны, деплой.
+description: CI/CD-ի կանոններ։ GitHub Actions, pipeline-ներ, դեպլոյ։
 globs: [".github/**", "**/Dockerfile", "**/docker-compose*"]
 alwaysApply: false
 ---
 
-# ПРАВИЛА CI/CD
+# CI/CD-Ի ԿԱՆՈՆՆԵՐ
 
 > Автоматизация = консистентность. Каждый коммит проходит одинаковые проверки.
 

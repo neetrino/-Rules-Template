@@ -1,13 +1,13 @@
-# Neon — Полная настройка
+# Neon — Ամբողջական կարգավորում
 
-> Neon — serverless PostgreSQL с branching, autoscaling и автоматическими бэкапами.
+> Neon — serverless PostgreSQL branching, autoscaling և ավտոմատ բэкаպներով։
 
 ---
 
-## 📋 СОДЕРЖАНИЕ
+## 📋 ԲՈՎԱՆԴԱԿՈՒԹՅՈՒՆ
 
-1. [Создание аккаунта](#создание-аккаунта)
-2. [Создание проекта](#создание-проекта)
+1. [Հաշվի ստեղծում](#ստեղծում-ակաունտ)
+2. [Նախագծի ստեղծում](#նախագծի-ստեղծում)
 3. [Database Branching](#branching)
 4. [Connection Strings](#connection-strings)
 5. [Prisma Integration](#prisma)
@@ -21,21 +21,21 @@
 
 ---
 
-## 1. Создание аккаунта {#создание-аккаунта}
+## 1. Հաշվի ստեղծում {#ստեղծում-ակաունտ}
 
-### Шаги:
+### Քայլեր.
 
-1. Перейти на [neon.tech](https://neon.tech)
+1. Անցի՛ր [neon.tech](https://neon.tech)
 2. "Sign Up" → GitHub / Google / Email
-3. Выбрать план:
+3. Ընտրի՛ր պլան.
    - **Free** — 0.5 GB storage, 1 project, branching
-   - **Launch** — $19/месяц, 10 GB, 10 projects
-   - **Scale** — $69/месяц, 50 GB, unlimited projects
+   - **Launch** — $19/ամիս, 10 GB, 10 projects
+   - **Scale** — $69/ամիս, 50 GB, unlimited projects
 
-### Лимиты Free tier:
+### Free tier սահմանափակումներ.
 
-| Ресурс | Лимит |
-|--------|-------|
+| Ռեսուրս | Սահման |
+|---------|--------|
 | Storage | 0.5 GB |
 | Compute | 191.9 hours/month |
 | Projects | 1 |
@@ -44,40 +44,40 @@
 
 ---
 
-## 2. Создание проекта {#создание-проекта}
+## 2. Նախագծի ստեղծում {#նախագծի-ստեղծում}
 
-### Через UI:
+### UI-ով.
 
 1. Dashboard → "New Project"
-2. Настройки:
-   - **Name:** project-name
-   - **Postgres Version:** 16 (рекомендуется)
-   - **Region:** US East (ближе к Vercel)
-   - **Compute size:** 0.25 CU (Free) или больше
+2. Կարգավորումներ.
+   - **Name.** project-name
+   - **Postgres Version.** 16 (խորհուրդ տրվող)
+   - **Region.** US East (մոտ Vercel-ին)
+   - **Compute size.** 0.25 CU (Free) կամ ավելի
 
-### Regions:
+### Regions.
 
-| Region | Код | Использовать для |
-|--------|-----|------------------|
+| Region | Կոդ | Օգտագործել |
+|--------|-----|-------------|
 | US East (N. Virginia) | aws-us-east-1 | Vercel (default) |
 | US East (Ohio) | aws-us-east-2 | Alternative US |
 | US West (Oregon) | aws-us-west-2 | West Coast users |
 | Europe (Frankfurt) | aws-eu-central-1 | EU users |
 | Asia Pacific (Singapore) | aws-ap-southeast-1 | APAC users |
 
-### После создания:
+### Ստեղծումից հետո.
 
-- Автоматически создаётся `main` branch
-- Автоматически создаётся database `neondb`
-- Автоматически создаётся role (username)
+- Ավտոմատ ստեղծվում է `main` branch
+- Ավտոմատ ստեղծվում է database `neondb`
+- Ավտոմատ ստեղծվում է role (username)
 
 ---
 
 ## 3. Database Branching {#branching}
 
-> Главная фича Neon — database branches как git branches.
+> Neon-ի գլխավոր ֆիչը — database branches ինչպես git branches։
 
-### Концепция:
+### Կոնցեպցիա.
 
 ```
 main (production)
@@ -87,77 +87,77 @@ main (production)
 └── dev-feature-auth (local dev)
 ```
 
-### Создание branch через UI:
+### Branch ստեղծում UI-ով.
 
 1. Project → Branches → "New Branch"
-2. Настройки:
-   - **Name:** develop
-   - **Parent:** main
-   - **Include data:** Yes (копировать данные)
-   - **Compute:** Shared или Dedicated
+2. Կարգավորումներ.
+   - **Name.** develop
+   - **Parent.** main
+   - **Include data.** Yes (պատճենել տվյալները)
+   - **Compute.** Shared կամ Dedicated
 
-### Создание branch через CLI:
+### Branch ստեղծում CLI-ով.
 
 ```bash
-# Установка CLI
+# CLI-ի տեղադրում
 npm install -g neonctl
 
-# Логин
+# Մուտք
 neonctl auth
 
-# Создать branch
+# Branch ստեղծել
 neonctl branches create --name develop --project-id <project-id>
 
-# Создать branch с данными на определённый момент
+# Branch ստեղծել որոշակի պահի տվյալներով
 neonctl branches create --name restore-point --parent main --point-in-time "2024-01-15T10:00:00Z"
 ```
 
-### Типы branches:
+### Branch-երի տիպեր.
 
-| Тип | Назначение | Compute |
-|-----|------------|---------|
-| main | Production | Dedicated (рекомендуется) |
+| Տիպ | Նշանակություն | Compute |
+|-----|---------------|---------|
+| main | Production | Dedicated (խորհուրդ տրվող) |
 | develop | Staging/QA | Shared |
 | preview-* | PR previews | Shared, scale to zero |
-| dev-* | Local development | Shared, scale to zero |
+| dev-* | Տեղական զարգացում | Shared, scale to zero |
 
-### Автоматические preview branches (Vercel):
+### Ավտոմատ preview branches (Vercel).
 
-При Vercel Integration:
-- Каждый PR автоматически получает свой database branch
-- Branch удаляется при закрытии PR
+Vercel Integration-ի դեպքում.
+- Յուրաքանչյուր PR ավտոմատ ստանում է իր database branch-ը
+- Branch-ը ջնջվում է PR-ը փակելիս
 
 ---
 
 ## 4. Connection Strings {#connection-strings}
 
-### Формат:
+### Ձևաչափ.
 
 ```
 postgresql://[user]:[password]@[host]/[database]?sslmode=require
 ```
 
-### Типы connection strings:
+### Connection string-երի տիպեր.
 
-| Тип | Использование | Пример параметра |
-|-----|---------------|------------------|
-| Pooled | Приложение (Next.js, NestJS) | `?pgbouncer=true` |
-| Direct | Миграции (Prisma migrate) | Без pgbouncer |
+| Տիպ | Օգտագործում | Օրինակ պարամետր |
+|-----|--------------|-------------------|
+| Pooled | Ծրագիր (Next.js, NestJS) | `?pgbouncer=true` |
+| Direct | Միգրացիաներ (Prisma migrate) | Առանց pgbouncer |
 
-### Где найти:
+### Որտեղ գտնել.
 
 1. Project → Connection Details
-2. Выбрать branch
-3. Выбрать тип (Pooled / Direct)
-4. Копировать connection string
+2. Ընտրի՛ր branch
+3. Ընտրի՛ր տիպ (Pooled / Direct)
+4. Պատճենի՛ր connection string
 
-### Пример:
+### Օրինակ.
 
 ```bash
-# Pooled (для приложения)
+# Pooled (ծրագրի համար)
 DATABASE_URL="postgresql://user:pass@ep-xxx.us-east-2.aws.neon.tech/neondb?sslmode=require"
 
-# Direct (для миграций)
+# Direct (միգրացիաների համար)
 DIRECT_URL="postgresql://user:pass@ep-xxx.us-east-2.aws.neon.tech/neondb?sslmode=require"
 ```
 
@@ -165,7 +165,7 @@ DIRECT_URL="postgresql://user:pass@ep-xxx.us-east-2.aws.neon.tech/neondb?sslmode
 
 ## 5. Prisma Integration {#prisma}
 
-### schema.prisma:
+### schema.prisma.
 
 ```prisma
 generator client {
@@ -179,30 +179,30 @@ datasource db {
 }
 ```
 
-### .env.local:
+### .env.local.
 
 ```bash
-# Pooled connection (для приложения)
+# Pooled connection (ծրագրի համար)
 DATABASE_URL="postgresql://user:pass@ep-xxx-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require"
 
-# Direct connection (для миграций)
+# Direct connection (միգրացիաների համար)
 DIRECT_URL="postgresql://user:pass@ep-xxx.us-east-2.aws.neon.tech/neondb?sslmode=require"
 ```
 
-### Миграции:
+### Միգրացիաներ.
 
 ```bash
-# Создать миграцию
+# Միգրացիա ստեղծել
 npx prisma migrate dev --name init
 
-# Применить миграции (production)
+# Կիրառել միգրացիաներ (production)
 npx prisma migrate deploy
 
-# Сгенерировать клиент
+# Ստեղծել կլիենտ
 npx prisma generate
 ```
 
-### Singleton для Prisma Client:
+### Singleton Prisma Client-ի համար.
 
 ```typescript
 // lib/prisma.ts
@@ -227,36 +227,36 @@ if (process.env.NODE_ENV !== 'production') {
 
 ## 6. Vercel Integration {#vercel-integration}
 
-### Подключение:
+### Միացում.
 
 1. Vercel Dashboard → Project → Settings → Integrations
-2. "Browse Marketplace" → найти "Neon"
+2. "Browse Marketplace" → գտի՛ր "Neon"
 3. "Add Integration"
-4. Авторизовать Neon
-5. Выбрать Neon project
-6. Выбрать Vercel project(s)
-7. Настроить:
-   - **Production branch:** main
-   - **Preview branches:** автоматически создавать
+4. Ինքնորոշել Neon
+5. Ընտրի՛ր Neon project
+6. Ընտրի՛ր Vercel project(s)
+7. Կարգավորի՛ր.
+   - **Production branch.** main
+   - **Preview branches.** ավտոմատ ստեղծել
 
-### Что происходит автоматически:
+### Ինչ է ավտոմատ տեղի ունենում.
 
-1. **Environment Variables** добавляются в Vercel:
+1. **Environment Variables** ավելացվում են Vercel-ում.
    - `DATABASE_URL` (pooled)
    - `DATABASE_URL_UNPOOLED` (direct)
 
-2. **Preview Deployments:**
-   - PR создаётся → Neon branch создаётся
-   - PR закрывается → Neon branch удаляется
-   - Каждый preview получает изолированную БД
+2. **Preview Deployments.**
+   - PR ստեղծվում է → Neon branch ստեղծվում է
+   - PR փակվում է → Neon branch ջնջվում է
+   - Յուրաքանչյուր preview ստանում է մեկուսացված ԲԴ
 
-### Настройка branch для preview:
+### Preview-ի համար branch-ի կարգավորում.
 
 ```json
-// В Neon Dashboard → Integrations → Vercel
+// Neon Dashboard → Integrations → Vercel
 {
-  "preview_branch_parent": "main",  // или "develop"
-  "include_data": true               // копировать данные
+  "preview_branch_parent": "main",  // կամ "develop"
+  "include_data": true               // պատճենել տվյալները
 }
 ```
 
@@ -264,57 +264,57 @@ if (process.env.NODE_ENV !== 'production') {
 
 ## 7. Backup & Restore {#backup-restore}
 
-### Автоматические бэкапы:
+### Ավտոմատ բэкаպներ.
 
-Neon автоматически сохраняет историю изменений:
+Neon-ը ավտոմատ պահպանում է փոփոխությունների պատմությունը.
 
-| План | History Retention |
+| Պլան | History Retention |
 |------|-------------------|
 | Free | 7 days |
 | Launch | 7 days |
 | Scale | 30 days |
 
-### Point-in-Time Recovery (PITR):
+### Point-in-Time Recovery (PITR).
 
 ```bash
-# Создать branch на определённый момент времени
+# Branch ստեղծել ժամանակի որոշակի պահի համար
 neonctl branches create \
   --name restore-2024-01-15 \
   --parent main \
   --point-in-time "2024-01-15T10:00:00Z"
 ```
 
-### Через UI:
+### UI-ով.
 
 1. Project → Branches
 2. "Create Branch"
 3. Parent: main
-4. Enable "Point in time"
-5. Выбрать дату/время
+4. Միացրու՛ "Point in time"
+5. Ընտրի՛ր ամսաթիվ/ժամ
 
-### Restore в production:
+### Restore production-ում.
 
 ```bash
-# 1. Создать восстановленный branch
+# 1. Ստեղծել վերականգնված branch
 neonctl branches create --name restored --parent main --point-in-time "2024-01-15T10:00:00Z"
 
-# 2. Проверить данные в restored branch
+# 2. Ստուգել տվյալները restored branch-ում
 
-# 3. Если всё ОК - переключить приложение на restored branch
-# (обновить DATABASE_URL в Vercel)
+# 3. Եթե ամեն ինչ OK — փոխանցել ծրագիրը restored branch-ին
+# (թարմացնել DATABASE_URL Vercel-ում)
 
-# 4. Или: переименовать branches
+# 4. Կամ. branch-եր անվանափոխել
 neonctl branches rename main main-broken
 neonctl branches rename restored main
 ```
 
-### Экспорт данных:
+### Տվյալների export.
 
 ```bash
-# pg_dump через Neon connection
+# pg_dump Neon connection-ով
 pg_dump "postgresql://user:pass@ep-xxx.us-east-2.aws.neon.tech/neondb?sslmode=require" > backup.sql
 
-# Восстановление
+# Վերականգնում
 psql "postgresql://..." < backup.sql
 ```
 
@@ -322,34 +322,34 @@ psql "postgresql://..." < backup.sql
 
 ## 8. Autoscaling {#autoscaling}
 
-### Compute Units (CU):
+### Compute Units (CU).
 
-| CU | vCPU | RAM | Использование |
-|----|------|-----|---------------|
+| CU | vCPU | RAM | Օգտագործում |
+|----|------|-----|--------------|
 | 0.25 | 0.25 | 1 GB | Dev/Preview |
 | 0.5 | 0.5 | 2 GB | Small prod |
 | 1 | 1 | 4 GB | Medium prod |
 | 2 | 2 | 8 GB | Large prod |
 | 4+ | 4+ | 16+ GB | High traffic |
 
-### Настройка:
+### Կարգավորում.
 
 1. Project → Settings → Compute
-2. Настроить:
-   - **Min compute:** 0 (scale to zero) или 0.25
-   - **Max compute:** 2 (или больше)
-   - **Suspend after:** 5 минут неактивности
+2. Կարգավորի՛ր.
+   - **Min compute.** 0 (scale to zero) կամ 0.25
+   - **Max compute.** 2 (կամ ավելի)
+   - **Suspend after.** 5 րոպե անակտիվություն
 
-### Scale to Zero:
+### Scale to Zero.
 
-- Dev/Preview branches могут уходить в sleep
-- Первый запрос "будит" compute (~300-500ms cold start)
-- Production рекомендуется min 0.25 чтобы избежать cold starts
+- Dev/Preview branches-ը կարող են անցնել sleep
+- Առաջին հարցումը «արթնացնում է» compute (~300-500ms cold start)
+- Production-ի համար խորհուրդ է min 0.25 cold start-ից խուսափելու համար
 
-### Autosuspend настройка:
+### Autosuspend կարգավորում.
 
 ```bash
-# Через CLI
+# CLI-ով
 neonctl branches update main --compute-config '{"suspend_timeout": 300}'
 ```
 
@@ -357,87 +357,87 @@ neonctl branches update main --compute-config '{"suspend_timeout": 300}'
 
 ## 9. Monitoring {#monitoring}
 
-### Dashboard метрики:
+### Dashboard մետրիկներ.
 
-- **Connections:** активные подключения
-- **Compute time:** использование CPU
-- **Storage:** размер данных
-- **Data transfer:** объём трафика
+- **Connections.** ակտիվ միացումներ
+- **Compute time.** CPU-ի օգտագործում
+- **Storage.** տվյալների չափ
+- **Data transfer.** տրաֆիկի ծավալ
 
-### Query Insights:
+### Query Insights.
 
 1. Project → Monitoring → Query Insights
-2. Видны:
-   - Медленные запросы
-   - Частые запросы
+2. Տեսանելի են.
+   - Դանդաղ հարցումներ
+   - Հաճախակի հարցումներ
    - Query plans
 
-### Alerts (Pro+):
+### Alerts (Pro+).
 
 1. Project → Settings → Alerts
-2. Настроить:
+2. Կարգավորի՛ր.
    - Storage > 80%
    - Compute time > threshold
    - Connection errors
 
-### Логирование:
+### Լոգավորում.
 
 ```sql
--- Включить логирование медленных запросов
-ALTER SYSTEM SET log_min_duration_statement = 1000;  -- 1 секунда
+-- Միացնել դանդաղ հարցումների լոգավորումը
+ALTER SYSTEM SET log_min_duration_statement = 1000;  -- 1 վայրկյան
 ```
 
 ---
 
 ## 10. Security {#security}
 
-### IP Allow List (Pro+):
+### IP Allow List (Pro+).
 
 1. Project → Settings → IP Allow
-2. Добавить разрешённые IP:
+2. Ավելացրու՛ թույլատրված IP-ներ.
    - Vercel IP ranges
-   - Ваш офис/VPN
+   - Քո գրասենյակ/VPN
    - CI/CD servers
 
-### Roles & Permissions:
+### Roles & Permissions.
 
 ```sql
--- Создать read-only роль
+-- Read-only դեր ստեղծել
 CREATE ROLE readonly_user WITH LOGIN PASSWORD 'password';
 GRANT CONNECT ON DATABASE neondb TO readonly_user;
 GRANT USAGE ON SCHEMA public TO readonly_user;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO readonly_user;
 ```
 
-### SSL:
+### SSL.
 
-- Всегда включён (sslmode=require)
-- Нельзя отключить
+- Միշտ միացված (sslmode=require)
+- Չի կարելի անջատել
 
-### Branch Protection:
+### Branch Protection.
 
 1. Project → Settings → Branches
-2. Protect "main":
+2. Պաշտպանի՛ր "main".
    - Require confirmation for delete
-   - Prevent direct writes (только через миграции)
+   - Prevent direct writes (միայն միգրացիաներով)
 
 ---
 
 ## 11. CLI {#cli}
 
-### Установка:
+### Տեղադրում.
 
 ```bash
 npm install -g neonctl
 ```
 
-### Основные команды:
+### Հիմնական հրամաններ.
 
 ```bash
-# Авторизация
+# Ինքնորոշում
 neonctl auth
 
-# Проекты
+# Նախագծեր
 neonctl projects list
 neonctl projects create --name my-project
 
@@ -458,7 +458,7 @@ neonctl databases create --name testdb --project-id <id> --branch main
 neonctl query "SELECT version();" --project-id <id> --branch main
 ```
 
-### Использование в CI:
+### CI-ում օգտագործում.
 
 ```yaml
 # .github/workflows/migrate.yml
@@ -477,55 +477,55 @@ neonctl query "SELECT version();" --project-id <id> --branch main
 
 ## ✅ Checklist {#checklist}
 
-### Первоначальная настройка:
+### Նախնական կարգավորում.
 
-- [ ] Аккаунт создан
-- [ ] Project создан
-- [ ] Region выбран (близко к Vercel)
-- [ ] Main branch настроен
+- [ ] Հաշիվ ստեղծված
+- [ ] Project ստեղծված
+- [ ] Region ընտրված (մոտ Vercel-ին)
+- [ ] Main branch կարգավորված
 
-### Branches:
+### Branches.
 
 - [ ] main — production
-- [ ] develop — staging (опционально)
-- [ ] Preview branches через Vercel Integration
+- [ ] develop — staging (ընտրովի)
+- [ ] Preview branches Vercel Integration-ով
 
-### Connections:
+### Connections.
 
-- [ ] DATABASE_URL (pooled) для приложения
-- [ ] DIRECT_URL для миграций
-- [ ] Connection strings в Vercel
+- [ ] DATABASE_URL (pooled) ծրագրի համար
+- [ ] DIRECT_URL միգրացիաների համար
+- [ ] Connection strings Vercel-ում
 
-### Prisma:
+### Prisma.
 
-- [ ] schema.prisma настроен
-- [ ] directUrl добавлен
-- [ ] Начальная миграция создана
+- [ ] schema.prisma կարգավորված
+- [ ] directUrl ավելացված
+- [ ] Սկզբնական միգրացիա ստեղծված
 
-### Vercel Integration:
+### Vercel Integration.
 
-- [ ] Integration подключена
+- [ ] Integration միացված
 - [ ] Production branch = main
-- [ ] Preview branches автоматические
+- [ ] Preview branches ավտոմատ
 
-### Backup & Recovery:
+### Backup & Recovery.
 
-- [ ] Понимаете как использовать PITR
-- [ ] Знаете как создать restore branch
-- [ ] History retention достаточный
+- [ ] Հասկանում եք ինչպես օգտագործել PITR
+- [ ] Գիտեք ինչպես ստեղծել restore branch
+- [ ] History retention բավարար է
 
-### Security:
+### Security.
 
-- [ ] Connection strings не в коде
-- [ ] IP Allow List (если Pro+)
-- [ ] Branch protection для main
+- [ ] Connection strings-ը կոդում չեն
+- [ ] IP Allow List (եթե Pro+)
+- [ ] Branch protection main-ի համար
 
-### Performance:
+### Performance.
 
-- [ ] Compute size соответствует нагрузке
-- [ ] Scale to zero для dev branches
-- [ ] Min compute > 0 для production (если критично)
+- [ ] Compute size համապատասխանում է բեռին
+- [ ] Scale to zero dev branches-ի համար
+- [ ] Min compute > 0 production-ի համար (եթե կրիտիկական)
 
 ---
 
-**Версия:** 1.0
+**Տարբերակ.** 1.0
