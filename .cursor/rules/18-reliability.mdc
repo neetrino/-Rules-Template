@@ -1,10 +1,10 @@
 ---
-description: Правила надёжности. Timeouts, retries, graceful shutdown, fault tolerance.
+description: Հուսալիության կանոններ։ Timeouts, retries, graceful shutdown, fault tolerance։
 globs: ["**/*.ts", "**/api/**", "**/server/**"]
 alwaysApply: false
 ---
 
-# ПРАВИЛА НАДЁЖНОСТИ
+# ՀՈՒՍԱԼԻՈՒԹՅԱՆ ԿԱՆՈՆՆԵՐ
 
 > Всё ломается. Вопрос в том, как система на это реагирует.
 

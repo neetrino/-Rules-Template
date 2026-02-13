@@ -1,14 +1,14 @@
-# Cloudflare — Полная настройка
+# Cloudflare — Ամբողջական կարգավորում
 
-> Cloudflare — CDN, DNS, WAF, R2 Storage, и защита от DDoS.
+> Cloudflare — CDN, DNS, WAF, R2 Storage և DDoS-ից պաշտպանություն։
 
 ---
 
-## 📋 СОДЕРЖАНИЕ
+## 📋 ԲՈՎԱՆԴԱԿՈՒԹՅՈՒՆ
 
-1. [Создание аккаунта](#создание-аккаунта)
-2. [Добавление домена](#добавление-домена)
-3. [DNS настройка](#dns)
+1. [Հաշվի ստեղծում](#ստեղծում-ակաունտ)
+2. [Դոմենի ավելացում](#добавление-домена)
+3. [DNS կարգավորում](#dns)
 4. [SSL/TLS](#ssl-tls)
 5. [CDN & Caching](#cdn-caching)
 6. [R2 Storage](#r2-storage)
@@ -21,76 +21,76 @@
 
 ---
 
-## 1. Создание аккаунта {#создание-аккаунта}
+## 1. Հաշվի ստեղծում {#ստեղծում-ակաունտ}
 
-### Шаги:
+### Քայլեր.
 
-1. Перейти на [cloudflare.com](https://cloudflare.com)
+1. Անցի՛ր [cloudflare.com](https://cloudflare.com)
 2. "Sign Up"
-3. Подтвердить email
-4. Выбрать план:
-   - **Free** — базовый CDN, DNS, DDoS protection
-   - **Pro** — $20/месяц, WAF, Image Optimization
-   - **Business** — $200/месяц, advanced WAF, 24/7 support
+3. Հաստատի՛ր email
+4. Ընտրի՛ր պլան.
+   - **Free** — հիմնական CDN, DNS, DDoS protection
+   - **Pro** — $20/ամիս, WAF, Image Optimization
+   - **Business** — $200/ամիս, advanced WAF, 24/7 support
 
-### Что включено в Free:
+### Free-ում ներառված.
 
 - DNS hosting
 - CDN (200+ data centers)
 - DDoS protection (Layer 3/4)
 - Universal SSL
 - Page Rules (3)
-- Analytics (базовая)
+- Analytics (հիմնական)
 
 ---
 
-## 2. Добавление домена {#добавление-домена}
+## 2. Դոմենի ավելացում {#добавление-домена}
 
-### Шаги:
+### Քայլեր.
 
 1. Dashboard → "Add a Site"
-2. Ввести домен: `example.com`
-3. Выбрать план (Free)
-4. Cloudflare сканирует существующие DNS записи
-5. Проверить и подтвердить записи
-6. Получить Cloudflare nameservers:
+2. Մուտքագրի՛ր դոմեն. `example.com`
+3. Ընտրի՛ր պլան (Free)
+4. Cloudflare-ը սկանավորում է առկա DNS գրառումները
+5. Ստուգի՛ր և հաստատի՛ր գրառումները
+6. Ստացի՛ր Cloudflare nameservers.
    ```
    ada.ns.cloudflare.com
    bob.ns.cloudflare.com
    ```
-7. Изменить nameservers у регистратора домена
+7. Փոխի՛ր nameservers-ը դոմենի ռեգիստրատորում
 
-### Ожидание:
+### Սպասում.
 
-- DNS propagation: до 24 часов (обычно 1-2 часа)
-- Статус изменится на "Active"
+- DNS propagation. մինչև 24 ժամ (սովորաբար 1-2 ժամ)
+- Ստատուսը կփոխվի "Active"
 
 ---
 
-## 3. DNS настройка {#dns}
+## 3. DNS կարգավորում {#dns}
 
-### Панель DNS:
+### DNS պանել.
 
 1. Domain → DNS → Records
 
-### Типы записей:
+### Գրառումների տիպեր.
 
-| Тип | Назначение | Пример |
-|-----|------------|--------|
-| A | IPv4 адрес | @ → 76.76.21.21 (Vercel) |
-| AAAA | IPv6 адрес | @ → 2606:... |
+| Տիպ | Նշանակություն | Օրինակ |
+|-----|---------------|--------|
+| A | IPv4 հասցե | @ → 76.76.21.21 (Vercel) |
+| AAAA | IPv6 հասցե | @ → 2606:... |
 | CNAME | Alias | www → cname.vercel-dns.com |
 | MX | Email | @ → mail.provider.com |
 | TXT | Verification | @ → "v=spf1 ..." |
 
-### Для Vercel:
+### Vercel-ի համար.
 
 ```
 # Apex domain (example.com)
 Type: A
 Name: @
 Content: 76.76.21.21
-Proxy: ON (оранжевое облако)
+Proxy: ON (նարնջագույն ամպ)
 
 # WWW subdomain
 Type: CNAME
@@ -98,44 +98,44 @@ Name: www
 Content: cname.vercel-dns.com
 Proxy: ON
 
-# API subdomain (если отдельный backend)
+# API subdomain (եթե առանձին backend)
 Type: CNAME
 Name: api
 Content: your-api.railway.app
-Proxy: OFF (серое облако) или ON
+Proxy: OFF (մոխրագույն ամպ) կամ ON
 ```
 
-### Proxy Status:
+### Proxy Status.
 
-| Статус | Значение |
-|--------|----------|
-| 🟠 Proxied | Трафик через Cloudflare (CDN, WAF) |
-| ⚪ DNS only | Только DNS, без Cloudflare features |
+| Ստատուս | Արժեք |
+|---------|-------|
+| 🟠 Proxied | Տրաֆիկ Cloudflare-ով (CDN, WAF) |
+| ⚪ DNS only | Միայն DNS, առանց Cloudflare features |
 
-### Когда отключать Proxy:
+### Երբ անջատել Proxy.
 
-- WebSockets (если проблемы)
-- Некоторые API интеграции
-- Mail servers (MX записи)
+- WebSockets (եթե խնդիրներ կան)
+- Որոշ API ինտեգրացիաներ
+- Mail servers (MX գրառումներ)
 
 ---
 
 ## 4. SSL/TLS {#ssl-tls}
 
-### Настройка:
+### Կարգավորում.
 
 1. Domain → SSL/TLS → Overview
 
-### Режимы:
+### Ռեժիմներ.
 
-| Режим | Описание | Когда использовать |
-|-------|----------|-------------------|
-| Off | Нет HTTPS | ❌ НИКОГДА |
-| Flexible | HTTPS до CF, HTTP до origin | ⚠️ Не рекомендуется |
-| Full | HTTPS везде, self-signed OK | Для тестирования |
-| Full (strict) | HTTPS везде, valid cert | ✅ РЕКОМЕНДУЕТСЯ |
+| Ռեժիմ | Նկարագրություն | Երբ օգտագործել |
+|----------|-----------------|-----------------|
+| Off | HTTPS չկա | ❌ ԵՐԵՔԵԼԵՎ |
+| Flexible | HTTPS մինչև CF, HTTP մինչև origin | ⚠️ Խորհուրդ չի տրվում |
+| Full | HTTPS ամենուր, self-signed OK | Թեստավորման համար |
+| Full (strict) | HTTPS ամենուր, valid cert | ✅ ԽՈՐՀՈՒՐԴ ՏՐՎՈՒՄ |
 
-### Рекомендуемая настройка:
+### Խորհուրդ տրվող կարգավորում.
 
 ```
 SSL/TLS Mode: Full (strict)
@@ -144,21 +144,21 @@ Automatic HTTPS Rewrites: ON
 Minimum TLS Version: 1.2
 ```
 
-### Edge Certificates:
+### Edge Certificates.
 
 1. SSL/TLS → Edge Certificates
-2. "Universal SSL" включён автоматически
-3. Для wildcard (*.example.com) — настроить
+2. "Universal SSL" ավտոմատ միացված է
+3. Wildcard (*.example.com)-ի համար — կարգավորել
 
 ---
 
 ## 5. CDN & Caching {#cdn-caching}
 
-### Caching настройка:
+### Caching կարգավորում.
 
 1. Domain → Caching → Configuration
 
-### Основные настройки:
+### Հիմնական կարգավորումներ.
 
 ```
 Caching Level: Standard
@@ -166,11 +166,11 @@ Browser Cache TTL: Respect Existing Headers
 Crawler Hints: ON
 ```
 
-### Cache Rules:
+### Cache Rules.
 
 1. Caching → Cache Rules → Create Rule
 
-#### Пример: Кэшировать статику
+#### Օրինակ. Cache անել ստատիկան
 
 ```
 Name: Cache static assets
@@ -181,7 +181,7 @@ Then:
   - Browser TTL: 1 week
 ```
 
-#### Пример: Не кэшировать API
+#### Օրինակ. API-ն cache չանել
 
 ```
 Name: Bypass API
@@ -190,17 +190,17 @@ Then:
   - Cache eligibility: Bypass cache
 ```
 
-### Purge Cache:
+### Purge Cache.
 
 1. Caching → Configuration → Purge Cache
-2. Выбрать:
-   - Purge Everything — всё
-   - Custom Purge — конкретные URL
+2. Ընտրի՛ր.
+   - Purge Everything — ամեն ինչ
+   - Custom Purge — կոնկրետ URL-ներ
 
-### Программный purge:
+### Ծրագրային purge.
 
 ```typescript
-// После обновления контента
+// Կոնտենտի թարմացումից հետո
 async function purgeCache(urls: string[]) {
   await fetch(
     `https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/purge_cache`,
@@ -220,45 +220,45 @@ async function purgeCache(urls: string[]) {
 
 ## 6. R2 Storage {#r2-storage}
 
-> S3-совместимое object storage. Дешевле чем S3, без egress fees.
+> S3-համատեղելի object storage։ Ավելի էժան քան S3, առանց egress fees։
 
-### Создание bucket:
+### Bucket ստեղծում.
 
 1. Dashboard → R2 → Create bucket
 2. Name: `my-bucket`
-3. Location: Auto (или specific region)
+3. Location: Auto (կամ կոնկրետ region)
 
-### Pricing:
+### Pricing.
 
-| Ресурс | Цена |
-|--------|------|
-| Storage | $0.015 / GB / месяц |
+| Ռեսուրս | Գին |
+|---------|-----|
+| Storage | $0.015 / GB / ամիս |
 | Class A ops (write) | $4.50 / million |
 | Class B ops (read) | $0.36 / million |
 | Egress | FREE |
 
-### Настройка доступа:
+### Մուտքի կարգավորում.
 
-#### Публичный доступ (для static assets):
+#### Հրապարակային մուտք (static assets-ի համար).
 
 1. R2 → bucket → Settings
 2. Public access → Enable
-3. Custom domain (опционально):
+3. Custom domain (ընտրովի).
    - `files.example.com`
-   - Добавить CNAME в DNS
+   - Ավելացրու՛ CNAME DNS-ում
 
-#### API доступ:
+#### API մուտք.
 
 1. R2 → Manage R2 API Tokens
-2. Create API Token:
+2. Create API Token.
    - Permissions: Object Read & Write
    - Specify bucket(s)
-3. Получить:
+3. Ստացի՛ր.
    - Account ID
    - Access Key ID
    - Secret Access Key
 
-### Использование с Next.js:
+### Next.js-ով օգտագործում.
 
 ```typescript
 // lib/r2.ts
@@ -274,7 +274,7 @@ const R2 = new S3Client({
   },
 });
 
-// Загрузка файла
+// Ֆայլի բեռնում
 export async function uploadToR2(
   key: string,
   body: Buffer | Uint8Array,
@@ -290,7 +290,7 @@ export async function uploadToR2(
   return `https://${process.env.R2_PUBLIC_URL}/${key}`;
 }
 
-// Presigned URL для загрузки
+// Presigned URL բեռնման համար
 export async function getUploadUrl(key: string, contentType: string) {
   const command = new PutObjectCommand({
     Bucket: process.env.R2_BUCKET_NAME,
@@ -302,7 +302,7 @@ export async function getUploadUrl(key: string, contentType: string) {
 }
 ```
 
-### Environment Variables:
+### Environment Variables.
 
 ```bash
 CF_ACCOUNT_ID=your-account-id
@@ -316,33 +316,33 @@ R2_PUBLIC_URL=files.example.com
 
 ## 7. WAF (Web Application Firewall) {#waf}
 
-### Free план:
+### Free պլան.
 
-- Базовые managed rules
+- Հիմնական managed rules
 - 5 custom rules
 
-### Pro+ план:
+### Pro+ պլան.
 
 - OWASP Core Ruleset
 - Cloudflare Managed Ruleset
 - Unlimited custom rules
 
-### Настройка:
+### Կարգավորում.
 
 1. Domain → Security → WAF
 
-### Managed Rules:
+### Managed Rules.
 
 1. WAF → Managed Rules
-2. Включить:
+2. Միացրու՛.
    - Cloudflare Managed Ruleset
    - Cloudflare OWASP Core Ruleset (Pro+)
 
-### Custom Rules:
+### Custom Rules.
 
 1. WAF → Custom Rules → Create Rule
 
-#### Пример: Блокировать страны
+#### Օրինակ. Արկել երկրներ
 
 ```
 Name: Block countries
@@ -350,7 +350,7 @@ When: ip.geoip.country in {"RU" "CN" "KP"}
 Then: Block
 ```
 
-#### Пример: Rate limiting для API
+#### Օրինակ. Rate limiting API-ի համար
 
 ```
 Name: API Rate Limit
@@ -361,7 +361,7 @@ Then: Rate limit
   - Action: Block
 ```
 
-#### Пример: Защита админки
+#### Օրինակ. Ադմինի պաշտպանություն
 
 ```
 Name: Protect Admin
@@ -375,39 +375,39 @@ Then: Block
 
 ## 8. DDoS Protection {#ddos}
 
-### Включено по умолчанию:
+### Լռելյայն միացված.
 
 - Layer 3/4 DDoS mitigation
 - HTTP DDoS protection
 
-### Настройка:
+### Կարգավորում.
 
 1. Security → DDoS
-2. HTTP DDoS attack protection:
-   - Sensitivity: High (рекомендуется)
+2. HTTP DDoS attack protection.
+   - Sensitivity: High (խորհուրդ տրվող)
    - Action: Block
 
-### Under Attack Mode:
+### Under Attack Mode.
 
-Для экстренных ситуаций:
+Արտակարգ իրավիճակների համար.
 
 1. Overview → Under Attack Mode → ON
-2. Все посетители проходят JS challenge
+2. Բոլոր այցելուները անցնում են JS challenge
 
-### Bot Fight Mode:
+### Bot Fight Mode.
 
 1. Security → Bots → Bot Fight Mode: ON
-2. Блокирует известных bad bots
+2. Արկելում է հայտնի bad bots-ին
 
 ---
 
 ## 9. Page Rules {#page-rules}
 
-> Устаревает в пользу Rules, но всё ещё работает.
+> Հնացել է Rules-ի օգտին, բայց դեռ աշխատում է։
 
-### Примеры:
+### Օրինակներ.
 
-#### Redirect www to non-www:
+#### Redirect www to non-www.
 
 ```
 URL: www.example.com/*
@@ -415,14 +415,14 @@ Setting: Forwarding URL (301)
 Destination: https://example.com/$1
 ```
 
-#### Force HTTPS:
+#### Force HTTPS.
 
 ```
 URL: http://example.com/*
 Setting: Always Use HTTPS
 ```
 
-#### Cache Everything:
+#### Cache Everything.
 
 ```
 URL: example.com/static/*
@@ -435,17 +435,17 @@ Settings:
 
 ## 10. Workers {#workers}
 
-> Serverless functions на edge.
+> Serverless functions edge-ում։
 
-### Создание:
+### Ստեղծում.
 
 1. Workers & Pages → Create Application
 2. Create Worker
 
-### Пример Worker:
+### Worker-ի օրինակ.
 
 ```javascript
-// Redirect based on country
+// Redirect ըստ երկրի
 export default {
   async fetch(request) {
     const country = request.cf?.country;
@@ -459,7 +459,7 @@ export default {
 };
 ```
 
-### Привязка к домену:
+### Դոմենին կապել.
 
 1. Worker → Settings → Triggers
 2. Add Route: `example.com/*`
@@ -468,12 +468,12 @@ export default {
 
 ## 11. Analytics {#analytics}
 
-### Web Analytics:
+### Web Analytics.
 
 1. Analytics & Logs → Web Analytics
-2. Включить для домена
+2. Միացրու՛ դոմենի համար
 
-### Метрики:
+### Մետրիկներ.
 
 - Requests
 - Bandwidth
@@ -482,7 +482,7 @@ export default {
 - Threats blocked
 - Cache hit ratio
 
-### GraphQL API:
+### GraphQL API.
 
 ```graphql
 query {
@@ -504,46 +504,46 @@ query {
 
 ## ✅ Checklist {#checklist}
 
-### Первоначальная настройка:
+### Նախնական կարգավորում.
 
-- [ ] Аккаунт создан
-- [ ] Домен добавлен
-- [ ] Nameservers изменены у регистратора
-- [ ] Статус "Active"
+- [ ] Հաշիվ ստեղծված
+- [ ] Դոմեն ավելացված
+- [ ] Nameservers-ը փոխված ռեգիստրատորում
+- [ ] Ստատուս "Active"
 
-### DNS:
+### DNS.
 
-- [ ] A/CNAME записи для Vercel
-- [ ] MX записи для email (если нужно)
-- [ ] TXT записи для verification
+- [ ] A/CNAME գրառումներ Vercel-ի համար
+- [ ] MX գրառումներ email-ի համար (անհրաժեշտության դեպքում)
+- [ ] TXT գրառումներ verification-ի համար
 
-### SSL/TLS:
+### SSL/TLS.
 
 - [ ] Mode: Full (strict)
 - [ ] Always Use HTTPS: ON
 - [ ] Minimum TLS Version: 1.2
 
-### Caching:
+### Caching.
 
-- [ ] Cache Rules для статики
-- [ ] Bypass для API/dynamic content
-- [ ] Browser Cache TTL настроен
+- [ ] Cache Rules ստատիկայի համար
+- [ ] Bypass API/dynamic content-ի համար
+- [ ] Browser Cache TTL կարգավորված
 
-### R2 Storage (если нужен):
+### R2 Storage (անհրաժեշտության դեպքում).
 
-- [ ] Bucket создан
-- [ ] Public access или API access настроен
-- [ ] Custom domain (опционально)
-- [ ] CORS настроен
+- [ ] Bucket ստեղծված
+- [ ] Public access կամ API access կարգավորված
+- [ ] Custom domain (ընտրովի)
+- [ ] CORS կարգավորված
 
-### Security:
+### Security.
 
-- [ ] WAF Managed Rules включены
+- [ ] WAF Managed Rules միացված
 - [ ] Bot Fight Mode: ON
-- [ ] Rate Limiting для API
-- [ ] DDoS protection настроен
+- [ ] Rate Limiting API-ի համար
+- [ ] DDoS protection կարգավորված
 
-### Performance:
+### Performance.
 
 - [ ] Auto Minify: JS, CSS, HTML
 - [ ] Brotli: ON
@@ -552,4 +552,4 @@ query {
 
 ---
 
-**Версия:** 1.0
+**Տարբերակ.** 1.0

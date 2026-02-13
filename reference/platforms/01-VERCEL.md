@@ -1,13 +1,13 @@
-# Vercel — Полная настройка
+# Vercel — Ամբողջական կարգավորում
 
-> Vercel — платформа для деплоя frontend (Next.js) и serverless функций.
+> Vercel — frontend (Next.js) և serverless ֆունկցիաների դեպլոյի պլատֆորմ։
 
 ---
 
-## 📋 СОДЕРЖАНИЕ
+## 📋 ԲՈՎԱՆԴԱԿՈՒԹՅՈՒՆ
 
-1. [Создание аккаунта](#создание-аккаунта)
-2. [Подключение проекта](#подключение-проекта)
+1. [Հաշվի ստեղծում](#ստեղծում-ակաունտ)
+2. [Նախագծի միացում](#նախագծի-միացում)
 3. [Environment Variables](#environment-variables)
 4. [Domains](#domains)
 5. [Vercel Blob Storage](#vercel-blob-storage)
@@ -22,59 +22,59 @@
 
 ---
 
-## 1. Создание аккаунта {#создание-аккаунта}
+## 1. Հաշվի ստեղծում {#ստեղծում-ակաունտ}
 
-### Шаги:
+### Քայլեր.
 
-1. Перейти на [vercel.com](https://vercel.com)
+1. Անցի՛ր [vercel.com](https://vercel.com)
 2. "Sign Up" → "Continue with GitHub"
-3. Авторизовать Vercel в GitHub
-4. Выбрать план:
-   - **Hobby** — бесплатно, для личных проектов
-   - **Pro** — $20/месяц, для коммерческих проектов
-   - **Enterprise** — для крупных команд
+3. Ինքնորոշել Vercel-ը GitHub-ում
+4. Ընտրի՛ր պլան.
+   - **Hobby** — անվճար, անձնական նախագծերի համար
+   - **Pro** — $20/ամիս, կոմերցիալ նախագծերի համար
+   - **Enterprise** — մեծ թիմերի համար
 
-### После регистрации:
+### Գրանցումից հետո.
 
-- Подтвердить email
-- Настроить профиль
-- Подключить GitHub organization (если нужно)
+- Հաստատի՛ր email
+- Կարգավորի՛ր պրոֆիլ
+- Միացրու՛ GitHub organization (անհրաժեշտության դեպքում)
 
 ---
 
-## 2. Подключение проекта {#подключение-проекта}
+## 2. Նախագծի միացում {#նախագծի-միացում}
 
-### Способ 1: Через UI
+### Եղանակ 1. UI-ով
 
 1. Dashboard → "Add New Project"
 2. "Import Git Repository"
-3. Выбрать репозиторий
-4. Настроить:
-   - **Framework Preset:** Next.js (автоопределение)
-   - **Root Directory:** `.` или `apps/web` (для monorepo)
-   - **Build Command:** `npm run build` (или авто)
-   - **Output Directory:** `.next` (авто)
-   - **Install Command:** `npm install` (или `pnpm install`)
+3. Ընտրի՛ր repository
+4. Կարգավորի՛ր.
+   - **Framework Preset.** Next.js (ավտոորոշում)
+   - **Root Directory.** `.` կամ `apps/web` (monorepo-ի համար)
+   - **Build Command.** `npm run build` (կամ ավտո)
+   - **Output Directory.** `.next` (ավտո)
+   - **Install Command.** `npm install` (կամ `pnpm install`)
 
-### Способ 2: Через CLI
+### Եղանակ 2. CLI-ով
 
 ```bash
-# Установка CLI
+# CLI-ի տեղադրում
 npm i -g vercel
 
-# Логин
+# Մուտք
 vercel login
 
-# Подключение проекта
+# Նախագծի միացում
 cd your-project
 vercel link
 
-# Деплой
+# Դեպլոյ
 vercel          # preview
 vercel --prod   # production
 ```
 
-### Настройки проекта (vercel.json)
+### Նախագծի կարգավորում (vercel.json)
 
 ```json
 {
@@ -106,56 +106,56 @@ vercel --prod   # production
 
 ## 3. Environment Variables {#environment-variables}
 
-### Через UI:
+### UI-ով.
 
 1. Project → Settings → Environment Variables
-2. Add New:
-   - **Key:** `DATABASE_URL`
-   - **Value:** `postgresql://...`
-   - **Environment:** Production, Preview, Development
+2. Add New.
+   - **Key.** `DATABASE_URL`
+   - **Value.** `postgresql://...`
+   - **Environment.** Production, Preview, Development
 
-### Типы переменных:
+### Փոփոխականների տիպեր.
 
-| Тип | Описание | Пример |
-|-----|----------|--------|
-| Plaintext | Обычный текст | API_URL |
-| Secret | Зашифрованный | DATABASE_URL, API_KEY |
-| Reference | Ссылка на другую переменную | $DATABASE_URL |
+| Տիպ | Նկարագրություն | Օրինակ |
+|-----|-----------------|--------|
+| Plaintext | Սովորական տեքստ | API_URL |
+| Secret | Գաղտնագրված | DATABASE_URL, API_KEY |
+| Reference | Հղում այլ փոփոխականի | $DATABASE_URL |
 
-### Environments:
+### Environments.
 
-| Environment | Когда используется |
-|-------------|-------------------|
+| Environment | Երբ է օգտագործվում |
+|-------------|---------------------|
 | Production | main branch → production URL |
-| Preview | PR и другие branches → preview URL |
-| Development | `vercel dev` локально |
+| Preview | PR և այլ branches → preview URL |
+| Development | `vercel dev` տեղական |
 
-### Обязательные переменные:
+### Պարտադիր փոփոխականներ.
 
 ```bash
 # Database
 DATABASE_URL=postgresql://...
-DIRECT_URL=postgresql://...      # Без pooling для миграций
+DIRECT_URL=postgresql://...      # Առանց pooling միգրացիաների համար
 
 # Auth
 NEXTAUTH_SECRET=your-secret-32-chars-min
 NEXTAUTH_URL=https://your-domain.com
 
-# Публичные (доступны в браузере)
+# Հրապարակային (հասանելի բրաուզերում)
 NEXT_PUBLIC_API_URL=https://api.example.com
 NEXT_PUBLIC_APP_URL=https://your-domain.com
 ```
 
-### Через CLI:
+### CLI-ով.
 
 ```bash
-# Добавить переменную
+# Փոփոխական ավելացնել
 vercel env add DATABASE_URL production
 
-# Посмотреть переменные
+# Փոփոխականներ դիտել
 vercel env ls
 
-# Скачать .env.local
+# Ներբեռնել .env.local
 vercel env pull
 ```
 
@@ -163,16 +163,16 @@ vercel env pull
 
 ## 4. Domains {#domains}
 
-### Добавление домена:
+### Դոմեն ավելացնել.
 
 1. Project → Settings → Domains
 2. "Add Domain"
-3. Ввести домен: `example.com`
-4. Настроить DNS (см. ниже)
+3. Մուտքագրի՛ր դոմեն. `example.com`
+4. Կարգավորի՛ր DNS (տե՛ս ստորև)
 
-### DNS настройка:
+### DNS կարգավորում.
 
-#### Для apex domain (example.com):
+#### Apex domain (example.com)-ի համար.
 
 ```
 Type: A
@@ -180,7 +180,7 @@ Name: @
 Value: 76.76.21.21
 ```
 
-#### Для www:
+#### www-ի համար.
 
 ```
 Type: CNAME
@@ -188,7 +188,7 @@ Name: www
 Value: cname.vercel-dns.com
 ```
 
-#### Для subdomain (app.example.com):
+#### Subdomain (app.example.com)-ի համար.
 
 ```
 Type: CNAME
@@ -196,12 +196,12 @@ Name: app
 Value: cname.vercel-dns.com
 ```
 
-### SSL/HTTPS:
+### SSL/HTTPS.
 
-- Автоматически через Let's Encrypt
-- Принудительный HTTPS включён по умолчанию
+- Ավտոմատ Let's Encrypt-ով
+- HTTPS-ի հարկադրումը լռելյայն միացված է
 
-### Redirects:
+### Redirects.
 
 ```json
 // vercel.json
@@ -226,27 +226,27 @@ Value: cname.vercel-dns.com
 
 ## 5. Vercel Blob Storage {#vercel-blob-storage}
 
-> S3-совместимое хранилище для файлов.
+> S3-համատեղելի պահոց ֆայլերի համար։
 
-### Подключение:
+### Միացում.
 
 1. Project → Storage → Create Database
-2. Выбрать "Blob"
-3. Создать store
+2. Ընտրի՛ր "Blob"
+3. Ստեղծի՛ր store
 
-### Установка:
+### Տեղադրում.
 
 ```bash
 npm install @vercel/blob
 ```
 
-### Использование:
+### Օգտագործում.
 
 ```typescript
 // lib/blob.ts
 import { put, del, list } from '@vercel/blob';
 
-// Загрузка файла
+// Ֆայլի բեռնում
 export async function uploadFile(file: File) {
   const blob = await put(file.name, file, {
     access: 'public',
@@ -255,19 +255,19 @@ export async function uploadFile(file: File) {
   return blob.url;
 }
 
-// Удаление файла
+// Ֆայլի ջնջում
 export async function deleteFile(url: string) {
   await del(url);
 }
 
-// Список файлов
+// Ֆայլերի ցանկ
 export async function listFiles(prefix?: string) {
   const { blobs } = await list({ prefix });
   return blobs;
 }
 ```
 
-### API Route для загрузки:
+### API Route բեռնման համար.
 
 ```typescript
 // app/api/upload/route.ts
@@ -290,10 +290,10 @@ export async function POST(request: Request) {
 }
 ```
 
-### Лимиты:
+### Սահմանափակումներ.
 
-| План | Размер файла | Хранилище |
-|------|-------------|-----------|
+| Պլան | Ֆայլի չափ | Պահոց |
+|------|------------|-------|
 | Hobby | 4.5 MB | 1 GB |
 | Pro | 500 MB | 100 GB |
 
@@ -301,27 +301,27 @@ export async function POST(request: Request) {
 
 ## 6. Vercel KV (Redis) {#vercel-kv-redis}
 
-> Serverless Redis для кэширования и сессий.
+> Serverless Redis cache-ի և սեսիաների համար։
 
-### Подключение:
+### Միացում.
 
 1. Project → Storage → Create Database
-2. Выбрать "KV"
-3. Создать store
+2. Ընտրի՛ր "KV"
+3. Ստեղծի՛ր store
 
-### Установка:
+### Տեղադրում.
 
 ```bash
 npm install @vercel/kv
 ```
 
-### Использование:
+### Օգտագործում.
 
 ```typescript
 // lib/kv.ts
 import { kv } from '@vercel/kv';
 
-// Кэширование
+// Cache
 export async function getFromCache<T>(key: string): Promise<T | null> {
   return await kv.get<T>(key);
 }
@@ -340,7 +340,7 @@ export async function checkRateLimit(ip: string, limit: number): Promise<boolean
   const current = await kv.incr(key);
   
   if (current === 1) {
-    await kv.expire(key, 60); // 1 minute window
+    await kv.expire(key, 60); // 1 րոպե պատուհան
   }
   
   return current <= limit;
@@ -351,15 +351,15 @@ export async function checkRateLimit(ip: string, limit: number): Promise<boolean
 
 ## 7. Vercel Postgres {#vercel-postgres}
 
-> Альтернатива Neon, интегрирована в Vercel.
+> Neon-ի այլընտրանք, ինտեգրված Vercel-ում։
 
-### Подключение:
+### Միացում.
 
 1. Project → Storage → Create Database
-2. Выбрать "Postgres"
-3. Выбрать регион (ближе к функциям)
+2. Ընտրի՛ր "Postgres"
+3. Ընտրի՛ր region (մոտ ֆունկցիաներին)
 
-### Использование с Prisma:
+### Prisma-ով օգտագործում.
 
 ```prisma
 // schema.prisma
@@ -370,7 +370,7 @@ datasource db {
 }
 ```
 
-### Environment Variables (автоматически):
+### Environment Variables (ավտոմատ).
 
 ```bash
 POSTGRES_URL=postgres://...
@@ -382,25 +382,25 @@ POSTGRES_URL_NON_POOLING=postgres://...
 
 ## 8. Edge Config {#edge-config}
 
-> Глобальный key-value store для конфигурации (feature flags, etc.).
+> Գլոբալ key-value store կոնֆիգուրացիայի համար (feature flags և այլն)։
 
-### Подключение:
+### Միացում.
 
 1. Project → Storage → Create
-2. Выбрать "Edge Config"
+2. Ընտրի՛ր "Edge Config"
 
-### Использование:
+### Օգտագործում.
 
 ```typescript
 import { get } from '@vercel/edge-config';
 
-// В Edge Runtime
+// Edge Runtime-ում
 export async function getFeatureFlag(flag: string): Promise<boolean> {
   const value = await get<boolean>(flag);
   return value ?? false;
 }
 
-// Использование
+// Օգտագործում
 const isNewCheckoutEnabled = await getFeatureFlag('new-checkout');
 ```
 
@@ -408,24 +408,24 @@ const isNewCheckoutEnabled = await getFeatureFlag('new-checkout');
 
 ## 9. Web Application Firewall (WAF) {#waf}
 
-> Защита от атак. Доступно на Pro и выше.
+> Պաշտպանություն հարձակումներից։ Հասանելի Pro-ում և բարձր։
 
-### Настройка:
+### Կարգավորում.
 
 1. Project → Security → Firewall
 2. Enable Firewall
 
-### Встроенные правила:
+### Ներկառուցված rules.
 
 - SQL Injection protection
 - XSS protection
 - Path traversal protection
 - Rate limiting
 
-### Custom Rules:
+### Custom Rules.
 
 ```json
-// Через Dashboard или API
+// Dashboard կամ API-ով
 {
   "action": "block",
   "conditions": {
@@ -435,10 +435,10 @@ const isNewCheckoutEnabled = await getFeatureFlag('new-checkout');
 }
 ```
 
-### Rate Limiting:
+### Rate Limiting.
 
 1. Project → Security → Rate Limiting
-2. Add Rule:
+2. Add Rule.
    - Path: `/api/*`
    - Limit: 100 requests per minute
    - Action: Block
@@ -447,7 +447,7 @@ const isNewCheckoutEnabled = await getFeatureFlag('new-checkout');
 
 ## 10. Analytics & Speed Insights {#analytics}
 
-### Vercel Analytics:
+### Vercel Analytics.
 
 1. Project → Analytics → Enable
 
@@ -467,7 +467,7 @@ export default function RootLayout({ children }) {
 }
 ```
 
-### Speed Insights:
+### Speed Insights.
 
 ```typescript
 // app/layout.tsx
@@ -489,24 +489,24 @@ export default function RootLayout({ children }) {
 
 ## 11. Integrations {#integrations}
 
-### Neon Integration:
+### Neon Integration.
 
 1. Project → Settings → Integrations
 2. "Browse Marketplace" → Neon
-3. Connect → авторизовать
-4. Environment variables добавятся автоматически
-5. Preview branches получат свои database branches
+3. Connect → ինքնորոշել
+4. Environment variables ավելացվում են ավտոմատ
+5. Preview branches-ը ստանում են իրենց database branches-ը
 
-### Sentry Integration:
+### Sentry Integration.
 
 1. Integrations → Sentry
 2. Connect Sentry account
-3. Выбрать Sentry project
-4. Автоматическая загрузка source maps
+3. Ընտրի՛ր Sentry project
+4. Source maps-ի ավտոմատ ներբեռնում
 
-### Другие полезные интеграции:
+### Այլ օգտակար ինտեգրացիաներ.
 
-- **Checkly** — мониторинг и synthetic tests
+- **Checkly** — մոնիտորինգ և synthetic tests
 - **LogRocket** — session replay
 - **Split** — feature flags
 - **PlanetScale** — MySQL database
@@ -515,77 +515,77 @@ export default function RootLayout({ children }) {
 
 ## 12. Team & Collaboration {#team}
 
-### Создание Team:
+### Team ստեղծում.
 
 1. Dashboard → Settings → Teams
 2. "Create Team"
-3. Пригласить участников
+3. Հրավիրի՛ր մասնակիցներ
 
-### Роли:
+### Դերեր.
 
-| Роль | Права |
-|------|-------|
-| Owner | Полный доступ, billing |
-| Member | Деплой, настройки проектов |
-| Developer | Только деплой |
-| Viewer | Только просмотр |
+| Դեր | Իրավունքներ |
+|-----|--------------|
+| Owner | Ամբողջական մուտք, billing |
+| Member | Դեպլոյ, նախագծերի կարգավորում |
+| Developer | Միայն դեպլոյ |
+| Viewer | Միայն դիտում |
 
-### Git Integration:
+### Git Integration.
 
-- PR previews автоматически
-- Comments в PR с preview URL
-- Проверки статуса деплоя
+- PR previews ավտոմատ
+- Մեկնաբանություններ PR-ում preview URL-ով
+- Դեպլոյի ստատուսի ստուգումներ
 
 ---
 
 ## ✅ Checklist {#checklist}
 
-### Первоначальная настройка:
+### Նախնական կարգավորում.
 
-- [ ] Аккаунт создан
-- [ ] GitHub подключён
-- [ ] Проект импортирован
-- [ ] Framework preset выбран (Next.js)
+- [ ] Հաշիվ ստեղծված
+- [ ] GitHub միացված
+- [ ] Նախագիծը import արված
+- [ ] Framework preset ընտրված (Next.js)
 
-### Environment Variables:
+### Environment Variables.
 
-- [ ] DATABASE_URL настроен
-- [ ] NEXTAUTH_SECRET настроен
-- [ ] NEXTAUTH_URL настроен
-- [ ] Публичные переменные (NEXT_PUBLIC_*) настроены
-- [ ] Preview и Production разделены
+- [ ] DATABASE_URL կարգավորված
+- [ ] NEXTAUTH_SECRET կարգավորված
+- [ ] NEXTAUTH_URL կարգավորված
+- [ ] Հրապարակային փոփոխականներ (NEXT_PUBLIC_*) կարգավորված
+- [ ] Preview և Production բաժանված
 
-### Domains:
+### Domains.
 
-- [ ] Домен добавлен
-- [ ] DNS настроен
-- [ ] SSL работает
-- [ ] www redirect настроен (если нужен)
+- [ ] Դոմեն ավելացված
+- [ ] DNS կարգավորված
+- [ ] SSL-ը աշխատում է
+- [ ] www redirect կարգավորված (անհրաժեշտության դեպքում)
 
-### Storage (если нужен):
+### Storage (անհրաժեշտության դեպքում).
 
-- [ ] Blob для файлов
-- [ ] KV для кэша
-- [ ] Postgres или Neon integration
+- [ ] Blob ֆայլերի համար
+- [ ] KV cache-ի համար
+- [ ] Postgres կամ Neon integration
 
-### Security:
+### Security.
 
-- [ ] WAF включён (Pro)
-- [ ] Rate limiting настроен
-- [ ] Sensitive env vars помечены как Secret
+- [ ] WAF միացված (Pro)
+- [ ] Rate limiting կարգավորված
+- [ ] Զգայուն env vars նշված որպես Secret
 
-### Monitoring:
+### Monitoring.
 
-- [ ] Analytics включён
-- [ ] Speed Insights включён
-- [ ] Sentry подключён (опционально)
+- [ ] Analytics միացված
+- [ ] Speed Insights միացված
+- [ ] Sentry միացված (ընտրովի)
 
-### Performance:
+### Performance.
 
-- [ ] Регион выбран (близко к пользователям/DB)
-- [ ] Edge functions где нужно
-- [ ] Caching headers настроены
+- [ ] Region ընտրված (մոտ օգտատերերին/DB-ին)
+- [ ] Edge functions որտեղ պետք է
+- [ ] Caching headers կարգավորված
 
 ---
 
-**Версия:** 1.0
+**Տարբերակ.** 1.0

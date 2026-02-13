@@ -1,30 +1,30 @@
 ---
-description: Правила TypeScript. Применяется ко всем .ts и .tsx файлам.
+description: TypeScript-ի կանոններ։ Կիրառվում է բոլոր .ts և .tsx ֆայլներին։
 globs: ["**/*.ts", "**/*.tsx"]
 alwaysApply: false
 ---
 
-# ПРАВИЛА TYPESCRIPT
+# TYPESCRIPT-Ի ԿԱՆՈՆՆԵՐ
 
-> Строгая типизация = надёжный код. Никаких any, никаких компромиссов.
-
----
-
-## 🎯 ГЛАВНЫЕ ПРИНЦИПЫ
-
-1. **Strict Mode всегда включён** — `"strict": true` в tsconfig
-2. **any запрещён** — используй unknown или конкретные типы
-3. **Явные типы** — для параметров функций и возвращаемых значений
-4. **Inference где возможно** — для локальных переменных
+> Խիստ տիպացում = հուսալի կոդ։ Ոչ մի any, ոչ մի կոմպրոմիս։
 
 ---
 
-## 📝 ТИПЫ И ИНТЕРФЕЙСЫ
+## 🎯 ՀԻՄՆԱԿԱՆ ՍԿԶԲՈՒՆՔՆԵՐ
 
-### Когда interface, когда type
+1. **Strict Mode միշտ միացված** — `"strict": true` tsconfig-ում
+2. **any արգելված է** — օգտագործի՛ր unknown կամ կոնկրետ տիպեր
+3. **Բացահայտ տիպեր** — ֆունկցիաների պարամետրների և վերադարձվող արժեքների համար
+4. **Inference որտեղ հնարավոր է** — լոկալ փոփոխականների համար
+
+---
+
+## 📝 ՏԻՊԵՐ ԵՎ ԻՆՏԵՐՖԵՅՍՆԵՐ
+
+### Երբ interface, երբ type
 
 ```typescript
-// ✅ interface — для объектов и классов
+// ✅ interface — օբյեկտների և դասերի համար
 interface User {
   id: string;
   name: string;
@@ -36,44 +36,44 @@ interface UserService {
   createUser(data: CreateUserDTO): Promise<User>;
 }
 
-// ✅ type — для unions, intersections, примитивов
+// ✅ type — unions, intersections, պրիմիտիվների համար
 type UserRole = 'admin' | 'user' | 'guest';
 type Status = 'pending' | 'active' | 'disabled';
 type ID = string | number;
 type UserWithRole = User & { role: UserRole };
 
-// ✅ type — для функций
+// ✅ type — ֆունկցիաների համար
 type EventHandler = (event: Event) => void;
 type AsyncFunction<T> = () => Promise<T>;
 ```
 
-### Правила именования типов
+### Տիպերի անվանավորման կանոններ
 
 ```typescript
-// ✅ ХОРОШО — PascalCase, описательные имена
+// ✅ ԼԱՎ — PascalCase, նկարագրական անուններ
 interface UserProfile { ... }
 type OrderStatus = 'pending' | 'completed';
 type CreateUserDTO = { ... };
 type UserResponse = ApiResponse<User>;
 
-// ❌ ПЛОХО — префиксы I/T
-interface IUser { ... }  // Не используй I
-type TUserRole = ...;    // Не используй T
+// ❌ ՎԱՏ — I/T նախածանցներ
+interface IUser { ... }  // Չօգտագործել I
+type TUserRole = ...;    // Չօգտագործել T
 ```
 
 ---
 
-## 🚫 ЗАПРЕЩЁННЫЕ ПАТТЕРНЫ
+## 🚫 ԱՐԳԵԼՎԱԾ ՊԱՏԵՐՆԵՐ
 
-### any — НИКОГДА
+### any — ԵՐԵՔԵԼԵՎ
 
 ```typescript
-// ❌ ЗАПРЕЩЕНО
+// ❌ ԱՐԳԵԼՎԱԾ
 function process(data: any) { ... }
 const result: any = fetchData();
 const items = [] as any[];
 
-// ✅ Используй unknown
+// ✅ Օգտագործի՛ր unknown
 function process(data: unknown) {
   if (typeof data === 'string') {
     return data.toUpperCase();
@@ -84,23 +84,23 @@ function process(data: unknown) {
   throw new Error('Invalid data type');
 }
 
-// ✅ Используй generics
+// ✅ Օգտագործի՛ր generics
 function process<T>(data: T): T {
   return data;
 }
 
-// ✅ Используй конкретные типы
+// ✅ Օգտագործի՛ր կոնկրետ տիպեր
 function process(data: User | Product) { ... }
 ```
 
-### Type Assertions — минимизировать
+### Type Assertions — նվազագույնի հասցնել
 
 ```typescript
-// ❌ Избегай as
+// ❌ Խուսափի՛ր as-ից
 const user = data as User;
 const element = document.getElementById('app') as HTMLDivElement;
 
-// ✅ Используй type guards
+// ✅ Օգտագործի՛ր type guards
 function isUser(data: unknown): data is User {
   return (
     typeof data === 'object' &&
@@ -111,62 +111,62 @@ function isUser(data: unknown): data is User {
 }
 
 if (isUser(data)) {
-  console.log(data.name); // TypeScript знает что это User
+  console.log(data.name); // TypeScript-ը գիտի, որ սա User է
 }
 
-// ✅ Если assertion необходим — добавь комментарий
+// ✅ Եթե assertion անհրաժեշտ է — ավելացրու՛ մեկնաբանություն-հիմնավորում
 // Type assertion безопасен: getElementById гарантированно вернёт div
 const element = document.getElementById('app') as HTMLDivElement;
 ```
 
-### Non-null Assertion — избегать
+### Non-null Assertion — խուսափել
 
 ```typescript
-// ❌ Избегай !
+// ❌ Խուսափի՛ր !-ից
 const name = user!.name;
 const first = items![0];
 
-// ✅ Проверяй явно
+// ✅ Ստուգի՛ր բացահայտ
 if (!user) throw new Error('User required');
 const name = user.name;
 
-// ✅ Или используй optional chaining с fallback
+// ✅ Կամ օգտագործի՛ր optional chaining fallback-ով
 const name = user?.name ?? 'Unknown';
 ```
 
 ---
 
-## ✅ ЛУЧШИЕ ПРАКТИКИ
+## ✅ ԼԱՎԵՐԻՆ ՊՐԱԿՏԻԿՆԵՐ
 
 ### Utility Types
 
 ```typescript
-// Partial — все поля опциональные
+// Partial — բոլոր դաշտերը optional
 type UpdateUserDTO = Partial<User>;
 
-// Required — все поля обязательные
+// Required — բոլոր դաշտերը պարտադիր
 type CompleteUser = Required<User>;
 
-// Pick — только указанные поля
+// Pick — միայն նշված դաշտերը
 type UserPreview = Pick<User, 'id' | 'name'>;
 
-// Omit — все кроме указанных
+// Omit — բոլորը բացի նշվածներից
 type UserWithoutPassword = Omit<User, 'password'>;
 
-// Record — объект с ключами и значениями
+// Record — օբյեկտ բանալիներով և արժեքներով
 type UsersByRole = Record<UserRole, User[]>;
 
-// ReturnType — тип возвращаемого значения
+// ReturnType — վերադարձվող արժեքի տիպ
 type FetchResult = ReturnType<typeof fetchUser>;
 
-// Parameters — типы параметров функции
+// Parameters — ֆունկցիայի պարամետրների տիպեր
 type FetchParams = Parameters<typeof fetchUser>;
 ```
 
 ### Discriminated Unions
 
 ```typescript
-// ✅ Отличный паттерн для состояний
+// ✅ Լավ պատերն վիճակների համար
 type AsyncState<T> =
   | { status: 'idle' }
   | { status: 'loading' }
@@ -180,9 +180,9 @@ function renderState<T>(state: AsyncState<T>) {
     case 'loading':
       return <Spinner />;
     case 'success':
-      return <Data data={state.data} />; // TypeScript знает что data есть
+      return <Data data={state.data} />; // TypeScript-ը գիտի, որ data կա
     case 'error':
-      return <Error error={state.error} />; // TypeScript знает что error есть
+      return <Error error={state.error} />; // TypeScript-ը գիտի, որ error կա
   }
 }
 ```
@@ -190,17 +190,17 @@ function renderState<T>(state: AsyncState<T>) {
 ### Generics
 
 ```typescript
-// ✅ Generic функции
+// ✅ Generic ֆունկցիաներ
 function first<T>(items: T[]): T | undefined {
   return items[0];
 }
 
-// ✅ Generic с constraints
+// ✅ Generic constraints-ով
 function getProperty<T, K extends keyof T>(obj: T, key: K): T[K] {
   return obj[key];
 }
 
-// ✅ Generic интерфейсы
+// ✅ Generic ինտերֆեյսներ
 interface ApiResponse<T> {
   data: T;
   meta: {
@@ -220,7 +220,7 @@ interface PaginatedList<T = unknown> {
 ### Const Assertions
 
 ```typescript
-// ✅ as const для literal types
+// ✅ as const literal types-ի համար
 const STATUS = {
   PENDING: 'pending',
   ACTIVE: 'active',
@@ -230,7 +230,7 @@ const STATUS = {
 type Status = typeof STATUS[keyof typeof STATUS];
 // type Status = 'pending' | 'active' | 'disabled'
 
-// ✅ Для arrays
+// ✅ Զանգվածների համար
 const ROLES = ['admin', 'user', 'guest'] as const;
 type Role = typeof ROLES[number];
 // type Role = 'admin' | 'user' | 'guest'
@@ -238,12 +238,12 @@ type Role = typeof ROLES[number];
 
 ---
 
-## 🔧 ФУНКЦИИ
+## 🔧 ՖՈՒՆԿՑԻԱՆԵՐ
 
-### Типизация функций
+### Ֆունկցիաների տիպացում
 
 ```typescript
-// ✅ Явные типы параметров и возврата для публичных функций
+// ✅ Բացահայտ տիպեր պարամետրների և վերադարձի համար հրապարակային ֆունկցիաներում
 function createUser(data: CreateUserDTO): User {
   return {
     id: generateId(),
@@ -252,13 +252,13 @@ function createUser(data: CreateUserDTO): User {
   };
 }
 
-// ✅ Async функции
+// ✅ Async ֆունկցիաներ
 async function fetchUser(id: string): Promise<User> {
   const response = await api.get(`/users/${id}`);
   return response.data;
 }
 
-// ✅ Функции с колбэками
+// ✅ Ֆունկցիաներ կոլբեքներով
 function forEach<T>(
   items: T[],
   callback: (item: T, index: number) => void
@@ -266,22 +266,22 @@ function forEach<T>(
   items.forEach(callback);
 }
 
-// ✅ Optional параметры
+// ✅ Optional պարամետրներ
 function greet(name: string, title?: string): string {
   return title ? `Hello, ${title} ${name}` : `Hello, ${name}`;
 }
 
-// ✅ Default параметры
+// ✅ Default պարամետրներ
 function paginate<T>(items: T[], page = 1, limit = 20): T[] {
   const start = (page - 1) * limit;
   return items.slice(start, start + limit);
 }
 ```
 
-### Overloads (перегрузка)
+### Overloads (վերաբեռնում)
 
 ```typescript
-// ✅ Когда функция ведёт себя по-разному в зависимости от типа
+// ✅ Երբ ֆունկցիան տարբեր է վարվում տիպից կախված
 function createElement(tag: 'div'): HTMLDivElement;
 function createElement(tag: 'span'): HTMLSpanElement;
 function createElement(tag: 'input'): HTMLInputElement;
@@ -289,30 +289,30 @@ function createElement(tag: string): HTMLElement {
   return document.createElement(tag);
 }
 
-// Использование — TypeScript знает точный тип
+// Օգտագործում — TypeScript-ը գիտի ճշգրիտ տիպը
 const div = createElement('div'); // HTMLDivElement
 const input = createElement('input'); // HTMLInputElement
 ```
 
 ---
 
-## 📦 МОДУЛИ И ЭКСПОРТЫ
+## 📦 ՄՈԴՈՒԼՆԵՐ ԵՎ EXPORT-ՆԵՐ
 
-### Именованные экспорты (предпочтительно)
+### Անվանված export-ներ (նախընտրելի)
 
 ```typescript
-// ✅ ХОРОШО — именованные экспорты
+// ✅ ԼԱՎ — անվանված export-ներ
 export function createUser() { ... }
 export interface User { ... }
 export type UserRole = 'admin' | 'user';
 
-// Импорт
+// Import
 import { createUser, User, UserRole } from './users';
 
-// ❌ ИЗБЕГАЙ — default exports
+// ❌ ԽՈՒՍԱՓԻ՛Ր — default exports
 export default function createUser() { ... }
 
-// Импорт — можно назвать как угодно (плохо для рефакторинга)
+// Import — կարելի է ցանկացած անուն տալ (վատ ռեֆակտորինգի համար)
 import createUserFunction from './users';
 ```
 
@@ -326,20 +326,19 @@ export { useUsers } from './hooks/useUsers';
 export { userService } from './services/userService';
 export type { User, UserRole, CreateUserDTO } from './types';
 
-// Импорт — чисто и понятно
+// Import — մաքուր և հասկանալի
 import { UserList, useUsers, User } from '@/features/users';
 ```
 
 ---
 
-## ⚙️ КОНФИГУРАЦИЯ TSCONFIG
+## ⚙️ TSCONFIG ԿՈՆՖԻԳՈՒՐԱՑԻԱ
 
-### Рекомендуемые настройки
+### Խորհուրդ տրվող կարգավորումներ
 
 ```json
 {
   "compilerOptions": {
-    // Strict mode — ОБЯЗАТЕЛЬНО
     "strict": true,
     "noImplicitAny": true,
     "strictNullChecks": true,
@@ -349,20 +348,17 @@ import { UserList, useUsers, User } from '@/features/users';
     "noImplicitThis": true,
     "alwaysStrict": true,
     
-    // Дополнительные проверки
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedIndexedAccess": true,
     
-    // Модули
     "module": "ESNext",
     "moduleResolution": "bundler",
     "esModuleInterop": true,
     "isolatedModules": true,
     
-    // Paths
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
@@ -375,7 +371,7 @@ import { UserList, useUsers, User } from '@/features/users';
 
 ## 🛡️ TYPE GUARDS
 
-### Встроенные проверки
+### Ներկառուցված ստուգումներ
 
 ```typescript
 // typeof
@@ -396,7 +392,7 @@ if (Array.isArray(items)) { ... }
 ### Custom Type Guards
 
 ```typescript
-// ✅ Type predicate функции
+// ✅ Type predicate ֆունկցիաներ
 function isUser(value: unknown): value is User {
   return (
     typeof value === 'object' &&
@@ -416,10 +412,10 @@ function isApiError(error: unknown): error is ApiError {
   );
 }
 
-// Использование
+// Օգտագործում
 function handleData(data: unknown) {
   if (isUser(data)) {
-    console.log(data.name); // TypeScript знает тип
+    console.log(data.name); // TypeScript-ը գիտի տիպը
   }
 }
 ```
@@ -427,7 +423,7 @@ function handleData(data: unknown) {
 ### Assertion Functions
 
 ```typescript
-// ✅ Для валидации в runtime
+// ✅ Runtime վալիդացիայի համար
 function assertUser(value: unknown): asserts value is User {
   if (!isUser(value)) {
     throw new Error('Value is not a User');
@@ -440,10 +436,10 @@ function assertDefined<T>(value: T | undefined | null): asserts value is T {
   }
 }
 
-// Использование
+// Օգտագործում
 function processUser(data: unknown) {
   assertUser(data);
-  // После assert TypeScript знает что data это User
+  // assert-ից հետո TypeScript-ը գիտի, որ data-ն User է
   console.log(data.name);
 }
 ```
@@ -452,17 +448,17 @@ function processUser(data: unknown) {
 
 ## 📋 CHECKLIST
 
-### Перед коммитом
+### Commit-ից առաջ
 
-- [ ] `tsc --noEmit` проходит без ошибок
-- [ ] Нет `any` в коде
-- [ ] Все публичные функции имеют явные типы
-- [ ] Используются utility types где уместно
-- [ ] Type guards для проверок типов
-- [ ] Нет `!` (non-null assertion) без необходимости
-- [ ] Нет `as` без комментария-обоснования
+- [ ] `tsc --noEmit` անցնում է առանց սխալների
+- [ ] Կոդում `any` չկա
+- [ ] Բոլոր հրապարակային ֆունկցիաները ունեն բացահայտ տիպեր
+- [ ] Utility types օգտագործված են որտեղ հարմար է
+- [ ] Type guards տիպերի ստուգման համար
+- [ ] `!` (non-null assertion) չկա անհրաժեշտությունից դուրս
+- [ ] `as` չկա առանց մեկնաբանություն-հիմնավորման
 
 ---
 
-**Версия:** 1.0
-**Дата:** 2026-02-12
+**Տարբերակ.** 1.0
+**Ամսաթիվ.** 2026-02-12

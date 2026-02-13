@@ -1,32 +1,32 @@
 # Best Practices
 
-> Этот файл — краткая шпаргалка. Полные правила — в `.cursor/rules/`.
+> Այս ֆայլը — համառոտ օգնական։ Ամբողջական կանոնները — `.cursor/rules/`-ում։
 
 ---
 
-## Источники правил
+## Կանոնների աղբյուրներ
 
-| Тема | Файл |
+| Թեմա | Ֆայլ |
 |------|------|
-| Главные правила | `.cursor/rules/00-core.mdc` |
-| Стандарты кода | `.cursor/rules/02-coding-standards.mdc` |
-| Архитектура | `.cursor/rules/01-architecture.mdc` |
+| Հիմնական կանոններ | `.cursor/rules/00-core.mdc` |
+| Կոդի ստանդարտներ | `.cursor/rules/02-coding-standards.mdc` |
+| Ճարտարապետություն | `.cursor/rules/01-architecture.mdc` |
 | TypeScript | `.cursor/rules/03-typescript.mdc` |
-| Безопасность | `.cursor/rules/08-security.mdc` |
-| Обработка ошибок | `.cursor/rules/12-error-handling.mdc` |
+| Անվտանգություն | `.cursor/rules/08-security.mdc` |
+| Սխալների մշակում | `.cursor/rules/12-error-handling.mdc` |
 
-## Быстрые правила
+## Արագ կանոններ
 
-- **Функции:** ≤ 50 строк, ≤ 4 параметра
-- **Файлы:** ≤ 300 строк
-- **Вложенность:** ≤ 3 уровня
-- **TypeScript:** strict mode, без `any`
-- **Экспорты:** именованные, без default
-- **Стиль:** Tailwind, без inline styles
-- **Секреты:** только через env
-- **Пароли:** argon2
-- **ORM:** Prisma (без raw SQL)
+- **Ֆունկցիաներ.** ≤ 50 տող, ≤ 4 պարամետր
+- **Ֆայլեր.** ≤ 300 տող
+- **Բնիկություն.** ≤ 3 մակարդակ
+- **TypeScript.** strict mode, առանց `any`
+- **Export-ներ.** անվանված, առանց default
+- **Ոճ.** Tailwind, առանց inline styles
+- **Գաղտնիքներ.** միայն env-ով
+- **Գաղտնաբառեր.** argon2
+- **ORM.** Prisma (առանց raw SQL)
 
 ---
 
-**Последнее обновление:** 2026-02-12
+**Վերջին թարմացում.** 2026-02-12
