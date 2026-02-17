@@ -3,8 +3,24 @@
 > На основе аудита предложения и существующих правил проекта (17-cicd, 10-testing, 02-coding-standards, 13-git-workflow).
 > Приоритет: скорость + стабильность. Команда 1–5 человек.
 
-**Статус:** Ожидает внедрения
+**Статус:** Внедрено в шаблон
 **Дата:** 2026-02-17
+
+---
+
+## Где что живёт (после внедрения)
+
+| Что | Где | Для кого |
+|-----|-----|----------|
+| `prettier.config.cjs` | Корень шаблона | Автоматически |
+| `.prettierignore` | Корень шаблона | Автоматически |
+| `.commitlintrc.json` | Корень шаблона | Автоматически |
+| CI workflow template | `reference/workflows/ci-quality.yml.example` | AI копирует при создании проекта |
+| Scripts + devDependencies | `17-cicd.mdc` + `21-project-onboarding.mdc` (Step 3.1.1) | AI выполняет при создании проекта |
+| Husky hooks setup | `21-project-onboarding.mdc` (Step 3.1.1) | AI выполняет при создании проекта |
+| Branch Protection | `19-checklists.mdc` + `README.md` | Разработчик делает вручную |
+| Secret Protection | `19-checklists.mdc` + `README.md` | Разработчик делает вручную |
+| Dependabot npm | `.github/dependabot.yml` (раскомментировать) | Разработчик или AI |
 
 ---
 
